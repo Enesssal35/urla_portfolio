@@ -388,6 +388,7 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
       <thead>
         <tr>
           <th>Hisse</th>
+          <th>Hisse Adı</th>
           <th>Toplam Lot</th>
           <th>Top. Brüt (TL)</th>
           <th>Top. Net (TL)</th>
@@ -397,7 +398,7 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
         </tr>
       </thead>
       <tbody id="divTableBody">
-        <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>
+        <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>
       </tbody>
     </table>
   </div>
@@ -1649,6 +1650,200 @@ function saveScanResults() {
   closeDivScanModal();
 }
 
+// ── CANLI VE SESSİZ TEMETTÜ TARAMA MOTORU ──
+async function autoScanDividendsSilent() {
+  try {
+    const allSymbols = portfolio.map(s => s.ticker);
+    if (allSymbols.length === 0) return;
+    
+    // Proxy URL normalizasyonu
+    let proxyBase = customProxy ? customProxy.trim() : '';
+    if (proxyBase && !proxyBase.endsWith('/') && !proxyBase.includes('?')) {
+      proxyBase += '/';
+    }
+    const buildProxyUrl = (targetUrl) => {
+      if (!proxyBase) return targetUrl;
+      if (proxyBase.includes('?')) {
+        if (proxyBase.endsWith('url=')) return proxyBase + encodeURIComponent(targetUrl);
+        else if (proxyBase.includes('url=')) return proxyBase.replace('url=', 'url=' + encodeURIComponent(targetUrl));
+        else return proxyBase + (proxyBase.endsWith('&') ? '' : '&') + 'url=' + encodeURIComponent(targetUrl);
+      } else {
+        return proxyBase + targetUrl;
+      }
+    };
+
+    // USD/TRY Geçmiş Kurlarını Çek
+    const usdUrl = buildProxyUrl('https://query2.finance.yahoo.com/v8/finance/chart/USDTRY=X?interval=1d&range=5y');
+    const usdRes = await fetch(usdUrl, { cache: 'no-cache' });
+    if (!usdRes.ok) return;
+    const usdJson = await usdRes.json();
+    const usdResult = usdJson?.chart?.result?.[0];
+    const usdMap = {};
+    if (usdResult) {
+      const ts = usdResult.timestamp || [];
+      const quotes = usdResult.indicators?.quote?.[0]?.close || [];
+      ts.forEach((t, idx) => {
+        const dStr = new Date(t * 1000).toISOString().split('T')[0];
+        if (quotes[idx] !== null && quotes[idx] !== undefined) {
+          usdMap[dStr] = quotes[idx];
+        }
+      });
+    }
+
+    const getHistoricalFxLocal = (dateStr) => {
+      if (usdMap[dateStr]) return usdMap[dateStr];
+      let d = new Date(dateStr);
+      for (let i = 1; i <= 7; i++) {
+        d.setDate(d.getDate() - 1);
+        const prevStr = d.toISOString().split('T')[0];
+        if (usdMap[prevStr]) return usdMap[prevStr];
+      }
+      return usdTry;
+    };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Tüm hisselerin temettü geçmişini çek
+    const fetchPromises = portfolio.map(async (s, i) => {
+      try {
+        const url = buildProxyUrl(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s.ticker)}?interval=1d&range=5y&events=div`);
+        const res = await fetch(url, { cache: 'no-cache' });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const divs = data?.chart?.result?.[0]?.events?.dividends || {};
+        return { index: i, dividends: divs };
+      } catch (err) {
+        return null;
+      }
+    });
+
+    const results = await Promise.all(fetchPromises);
+    let changeCount = 0;
+
+    results.forEach(res => {
+      if (!res) return;
+      const s = portfolio[res.index];
+      const divs = res.dividends;
+
+      Object.values(divs).forEach(div => {
+        const divDateStr = new Date(div.date * 1000).toISOString().split('T')[0];
+        
+        let lotsCount = 0;
+        if (s.lots) {
+          s.lots.forEach(l => {
+            if (!l.date || l.date <= divDateStr) {
+              lotsCount += (l.qty || 0);
+            }
+          });
+        }
+
+        if (lotsCount > 0) {
+          if (!s.dividends) s.dividends = [];
+          const existingIdx = s.dividends.findIndex(d => d.date === divDateStr);
+
+          const grossPerShare = div.amount;
+          const gross = grossPerShare * lotsCount;
+          const tax = gross * 0.15;
+          const net = gross - tax;
+          const fx = getHistoricalFxLocal(divDateStr);
+          const netUSD = fx > 0 ? net / fx : 0;
+
+          if (existingIdx === -1) {
+            // Yeni temettü kaydı bulundu, otomatik ekle
+            s.dividends.push({
+              date: divDateStr,
+              grossPerShare,
+              qty: lotsCount,
+              withholdingPct: 15,
+              tax,
+              gross,
+              net,
+              fx,
+              netUSD
+            });
+            changeCount++;
+          } else {
+            // Var olan temettü. Eğer gelecek bir tarihte ise veya lot miktarı alımlarla değiştiyse güncelle
+            const ext = s.dividends[existingIdx];
+            if (ext.qty !== lotsCount || ext.grossPerShare !== grossPerShare) {
+              ext.qty = lotsCount;
+              ext.grossPerShare = grossPerShare;
+              ext.gross = gross;
+              ext.tax = tax;
+              ext.net = net;
+              ext.fx = fx;
+              ext.netUSD = netUSD;
+              changeCount++;
+            }
+          }
+        }
+      });
+    });
+
+    if (changeCount > 0) {
+      persist();
+      render();
+      showToast(`🤖 Canlı Temettü Güncellemesi: ${changeCount} adet temettü ödemesi arka planda otomatik güncellendi!`);
+    }
+  } catch (e) {
+    console.error('Arkaplan temettü tarama hatası:', e);
+  }
+}
+
+function showToast(msg) {
+  let container = document.getElementById('toastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    document.body.appendChild(container);
+  }
+  
+  if (!document.getElementById('toastStyles')) {
+    const style = document.createElement('style');
+    style.id = 'toastStyles';
+    style.textContent = `
+      #toastContainer {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+      }
+      .toast-msg {
+        background: var(--surface);
+        border: 1px solid var(--teal);
+        color: var(--ink);
+        padding: 12px 18px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        pointer-events: auto;
+        animation: toastIn 0.3s cubic-bezier(.22,1,.36,1) forwards, toastOut 0.3s ease 4.7s forwards;
+        max-width: 320px;
+        font-family: var(--sans);
+      }
+      @keyframes toastIn {
+        from { transform: translateX(120%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes toastOut {
+        to { transform: translateY(20px); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'toast-msg';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
+
 function renderDividends() {
   let totGross = 0, totNet = 0, totUSD = 0, totCost = 0;
   let hasDividendsAny = false;
@@ -1677,6 +1872,7 @@ function renderDividends() {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td style="font-weight:bold;color:${col};cursor:pointer" onclick="openPanel(${i})">${s.ticker.replace('.IS', '')}</td>
+        <td style="font-size:11px;color:var(--ink2)">${s.name || '—'}</td>
         <td>${fmt(c.totalQty)}</td>
         <td>${fTL(dSum.totalGross)}</td>
         <td style="font-weight:600;color:var(--teal)">${fTL(dSum.totalNet)}</td>
@@ -1711,6 +1907,7 @@ function renderDividends() {
     row.style.background = 'var(--bg2)';
     row.innerHTML = `
       <td>TOPLAM</td>
+      <td>—</td>
       <td>—</td>
       <td>${fTL(totGross)}</td>
       <td style="color:var(--teal)">${fTL(totNet)}</td>
@@ -1993,6 +2190,11 @@ function renderBarChart() {
 render();
 startAutoRefresh();
 window.addEventListener('resize', () => { renderGrid(); renderBarChart(); });
+
+// Sayfa açıldıktan 3 saniye sonra arka planda canlı temettü taraması yap
+setTimeout(() => {
+  autoScanDividendsSilent();
+}, 3000);
 </script>
 </body>
 </html>
