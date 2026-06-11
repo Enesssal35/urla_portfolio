@@ -219,6 +219,15 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
   .sc-val{font-size:14px;}
   .treemap{grid-template-columns:repeat(8,1fr);}
 }
+.dividend-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:24px;}
+.div-scan-btn{height:34px;padding:0 14px;border-radius:9px;border:none;background:var(--blue);color:#fff;font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:6px;}
+.div-scan-btn:hover{filter:brightness(1.05);}
+@media(max-width:768px){
+  #divSumGrid{grid-template-columns:repeat(2,1fr) !important;}
+}
+@media(max-width:480px){
+  #divSumGrid{grid-template-columns:1fr !important;}
+}
 </style>
 </head>
 <body>
@@ -341,6 +350,64 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
 <div class="sec">Hisse Portföyü</div>
 <div class="treemap" id="grid"></div>
 
+<!-- ── TEMETTÜ MERKEZİ ── -->
+<div class="sec" style="margin-top:8px">Temettü Merkezi</div>
+<div class="dividend-box">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div style="font-size:13px;font-weight:700;color:var(--ink);">Temettü Özetleri & Geçmişi</div>
+    <button class="div-scan-btn" onclick="scanDividends()">🤖 Temettüleri Otomatik Tara</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;" id="divSumGrid">
+    <div class="scard"><div class="scard-bar" style="background:var(--teal)"></div><div class="sc-lbl">Toplam Brüt Temettü</div><div class="sc-val" id="dSumGross">—</div><div class="sc-sub">TL bazlı brüt toplam</div></div>
+    <div class="scard"><div class="scard-bar" style="background:var(--teal)"></div><div class="sc-lbl">Toplam Net Temettü</div><div class="sc-val" id="dSumNet">—</div><div class="sc-sub" id="dSumNetSub">Maliyet % —</div></div>
+    <div class="scard"><div class="scard-bar" style="background:var(--blue)"></div><div class="sc-lbl">Toplam Net (USD)</div><div class="sc-val" id="dSumUSD">—</div><div class="sc-sub">Ödeme kurlarıyla</div></div>
+    <div class="scard"><div class="scard-bar" style="background:var(--purple)"></div><div class="sc-lbl">Temettü Verimi (YoC)</div><div class="sc-val" id="dSumYoC">—</div><div class="sc-sub">Toplam Net / Maliyet %</div></div>
+  </div>
+
+  <div style="overflow-x:auto;margin-bottom:18px;">
+    <table class="lot-table" id="divTable" style="width:100%;min-width:600px;">
+      <thead>
+        <tr>
+          <th>Hisse</th>
+          <th>Toplam Lot</th>
+          <th>Top. Brüt (TL)</th>
+          <th>Top. Net (TL)</th>
+          <th>Top. Net (USD)</th>
+          <th>Maliyet (TL)</th>
+          <th>YoC (Maliyet %)</th>
+        </tr>
+      </thead>
+      <tbody id="divTableBody">
+        <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-top:10px;border-top:1px solid var(--border)">
+    Kronolojik Ödemeler
+  </div>
+  <div style="overflow-x:auto;max-height:200px;overflow-y:auto;">
+    <table class="lot-table" id="divHistoryTable" style="width:100%;min-width:600px;">
+      <thead>
+        <tr>
+          <th>Tarih</th>
+          <th>Hisse</th>
+          <th>Brüt (Hisse Başı)</th>
+          <th>Ödenen Lot</th>
+          <th>Toplam Brüt</th>
+          <th>Stopaj</th>
+          <th>Toplam Net</th>
+          <th>Net (USD)</th>
+        </tr>
+      </thead>
+      <tbody id="divHistoryTableBody">
+        <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Geçmiş ödeme yok.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <!-- ── ÇUBUK GRAFİK ── -->
 <div class="sec" style="margin-top:8px">Hisse Değer Karşılaştırması</div>
 <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px 20px 16px;margin-bottom:24px;overflow-x:auto;">
@@ -370,6 +437,7 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
     <div class="p-sec">Maliyet</div><div id="pMal"></div>
     <div class="p-sec">Kar / Zarar</div><div class="kz-block" id="pKZ"></div>
     <div class="p-sec">Alım Geçmişi</div><div id="pLots"></div>
+    <div class="p-sec">Temettü Ödemeleri</div><div id="pDivs"></div>
     <div class="p-btns">
       <button class="pbtn pbtn-e" onclick="openEdit()">Düzenle</button>
       <button class="pbtn pbtn-d" onclick="delStock()">Sil</button>
@@ -488,6 +556,72 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
   </div>
 </div>
 
+<!-- ── TEMETTÜ MODAL ── -->
+<div class="overlay" id="divOverlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-drag"></div>
+    <div class="modal-title" id="divMTitle">Temettü Ekle</div>
+    <div class="frow">
+      <div class="fg h"><label class="flbl">Hisse Başı Brüt (TL)</label><input type="number" id="dGrossPerShare" placeholder="1.50" step="0.0001" oninput="calcDivModal()"></div>
+      <div class="fg h"><label class="flbl">Lot Sayısı (O Tarihteki)</label><input type="number" id="dQty" placeholder="100" min="1" oninput="calcDivModal()"></div>
+    </div>
+    <div class="frow">
+      <div class="fg h"><label class="flbl">Stopaj %</label><input type="number" id="dTaxPct" placeholder="15" value="15" step="0.1" oninput="calcDivModal()"></div>
+      <div class="fg h"><label class="flbl">O Günkü USD/TRY</label><input type="number" id="dFx" placeholder="38.50" step="0.01" oninput="calcDivModal()"></div>
+    </div>
+    <div class="fg">
+      <label class="flbl">Ödeme Tarihi</label>
+      <input type="date" id="dDate" onchange="autoFillLotCountOnDate()">
+    </div>
+    
+    <!-- Hesaplanan Değerler Önizleme -->
+    <div style="background:var(--bg2); border:1px solid var(--border); border-radius:9px; padding:10px 12px; margin-top:10px; font-family:var(--mono); font-size:11px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Toplam Brüt:</span><span id="dPreviewGross">—</span></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Stopaj Kesintisi:</span><span id="dPreviewTax">—</span></div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:bold; color:var(--teal)"><span>Toplam Net (TL):</span><span id="dPreviewNet">—</span></div>
+      <div style="display:flex; justify-content:space-between; color:var(--blue)"><span>Toplam Net (USD):</span><span id="dPreviewUSD">—</span></div>
+    </div>
+    
+    <div class="mbtns" style="margin-top:14px">
+      <button class="mb mb-s" onclick="closeDivModal()">İptal</button>
+      <button class="mb mb-p" onclick="saveDiv()">Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TEMETTÜ TARAMA MODAL ── -->
+<div class="overlay" id="divScanOverlay">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-drag"></div>
+    <div class="modal-title">Otomatik Bulunan Temettüler</div>
+    <p class="hint" style="margin-bottom:12px;">Portföyünüzün alım tarihleri ve lot miktarları taranarak son 5 yılda hak kazandığınız temettüler tespit edilmiştir. Kaydetmek istediklerinizi seçin:</p>
+    
+    <div style="overflow-x:auto;max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:9px;margin-bottom:14px;">
+      <table class="lot-table" style="width:100%;min-width:460px;">
+        <thead>
+          <tr>
+            <th style="width:30px;"><input type="checkbox" id="scanSelectAll" checked onchange="toggleSelectAllScan()"></th>
+            <th>Tarih</th>
+            <th>Hisse</th>
+            <th>Hisse Başı</th>
+            <th>Lot</th>
+            <th>Toplam Net</th>
+            <th>USD</th>
+          </tr>
+        </thead>
+        <tbody id="divScanTableBody">
+          <!-- Dinamik doldurulacak -->
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="mbtns">
+      <button class="mb mb-s" onclick="closeDivScanModal()">İptal</button>
+      <button class="mb mb-p" onclick="saveScanResults()">Seçilenleri Kaydet</button>
+    </div>
+  </div>
+</div>
+
 <script>
 window.onerror = function(msg, url, lineNo, columnNo, error) {
   const errDiv = document.createElement('div');
@@ -538,6 +672,7 @@ portfolio.forEach(s => {
   if (!s.ticker.includes('.') && !s.ticker.includes('-') && !s.ticker.includes('=')) {
     s.ticker = s.ticker + '.IS';
   }
+  if (!s.dividends) s.dividends = [];
 });
 let usdTry     = parseFloat(localStorage.getItem('avFx') || '38.50');
 let customProxy = localStorage.getItem('avProxy') || 'https://urla-portfolio-proxy.enesla6352.workers.dev/';
@@ -873,7 +1008,7 @@ function persist() {
 // ══════════════════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════════════════
-function render() { renderSummary(); renderGrid(); renderAlloc(); if (panelIdx >= 0) refreshPanel(); renderBarChart(); }
+function render() { renderSummary(); renderGrid(); renderAlloc(); if (panelIdx >= 0) refreshPanel(); renderBarChart(); renderDividends(); }
 
 function renderSummary() {
   let totTL=0, totUSD=0, costTL=0, costUSD=0;
@@ -1112,6 +1247,26 @@ function refreshPanel() {
     html += `</tbody></table><button onclick="openLotModal()" class="abtn abtn-g" style="width:100%;margin-top:9px;height:34px;justify-content:center;font-size:11px">+ Alım Ekle</button>`;
     document.getElementById('pLots').innerHTML = html;
   }
+
+  // Render Dividends list in panel
+  const divs = s.dividends || [];
+  const dSum = calcDivSummary(s);
+  if (!divs.length) {
+    document.getElementById('pDivs').innerHTML = `
+      <div style="font-size:11px;color:var(--muted);padding:8px 0">Henüz temettü ödemesi kaydedilmemiş.</div>
+      <button onclick="openDivModal()" class="abtn abtn-g" style="width:100%;margin-top:8px;height:36px;justify-content:center">+ Temettü Ekle</button>`;
+  } else {
+    const sortedDivs = [...divs].map((d, di) => ({...d, _i:di})).sort((a, b) => (b.date||'').localeCompare(a.date||''));
+    let html = `<div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-family:var(--mono);">
+      Toplam Net: <span style="font-weight:bold;color:var(--teal)">${fTL(dSum.totalNet)}</span> (${fUSD(dSum.totalUSD)}) · YoC: <span style="font-weight:bold;color:var(--teal)">${dSum.yoc !== null ? fmtN(dSum.yoc, 2, 2) + '%' : '—'}</span>
+    </div>`;
+    html += `<table class="lot-table"><thead><tr><th>Tarih</th><th>Brüt (H.B.)</th><th>Lot</th><th>Net (TL)</th><th></th></tr></thead><tbody>`;
+    sortedDivs.forEach(d => {
+      html += `<tr><td>${fDate(d.date)}</td><td>${fTL(d.grossPerShare)}</td><td>${fmt(d.qty)}</td><td style="font-weight:600;color:var(--teal)">${fTL(d.net)}</td><td><button class="lot-del" onclick="delDiv(${d._i})">✕</button></td></tr>`;
+    });
+    html += `</tbody></table><button onclick="openDivModal()" class="abtn abtn-g" style="width:100%;margin-top:9px;height:34px;justify-content:center;font-size:11px">+ Temettü Ekle</button>`;
+    document.getElementById('pDivs').innerHTML = html;
+  }
 }
 
 function delLot(li) {
@@ -1141,6 +1296,437 @@ function saveLot() {
   if (!portfolio[panelIdx].lots) portfolio[panelIdx].lots = [];
   portfolio[panelIdx].lots.push({qty, priceTL:price, fx, date:date||null});
   persist(); closeLotModal(); render(); refreshPanel();
+}
+
+// ══════════════════════════════════════════════════════════════
+// TEMETTÜ İŞLEMLERİ
+// ══════════════════════════════════════════════════════════════
+function calcDivSummary(s) {
+  const divs = s.dividends || [];
+  const totalGross = divs.reduce((a, d) => a + (d.gross || 0), 0);
+  const totalNet = divs.reduce((a, d) => a + (d.net || 0), 0);
+  const totalUSD = divs.reduce((a, d) => a + (d.netUSD || 0), 0);
+  const c = calc(s);
+  const yoc = c.totalCostTL > 0 ? (totalNet / c.totalCostTL) * 100 : null;
+  return {totalGross, totalNet, totalUSD, yoc};
+}
+
+function openDivModal() {
+  document.getElementById('divMTitle').textContent = 'Temettü Ekle — ' + portfolio[panelIdx].ticker.replace('.IS', '');
+  document.getElementById('dGrossPerShare').value = '';
+  document.getElementById('dQty').value = '';
+  document.getElementById('dTaxPct').value = '15';
+  document.getElementById('dFx').value = usdTry || '';
+  document.getElementById('dDate').value = today();
+  
+  document.getElementById('dPreviewGross').textContent = '—';
+  document.getElementById('dPreviewTax').textContent = '—';
+  document.getElementById('dPreviewNet').textContent = '—';
+  document.getElementById('dPreviewUSD').textContent = '—';
+  
+  document.getElementById('divOverlay').classList.add('open');
+  autoFillLotCountOnDate();
+}
+
+function closeDivModal() { document.getElementById('divOverlay').classList.remove('open'); }
+
+function autoFillLotCountOnDate() {
+  if (panelIdx < 0) return;
+  const s = portfolio[panelIdx];
+  const selectedDate = document.getElementById('dDate').value;
+  if (!selectedDate) return;
+  
+  let totalLots = 0;
+  if (s.lots) {
+    s.lots.forEach(l => {
+      if (!l.date || l.date <= selectedDate) {
+        totalLots += (l.qty || 0);
+      }
+    });
+  }
+  document.getElementById('dQty').value = totalLots;
+  calcDivModal();
+}
+
+function calcDivModal() {
+  const grossPerShare = parseFloat(document.getElementById('dGrossPerShare').value) || 0;
+  const qty = parseFloat(document.getElementById('dQty').value) || 0;
+  const taxPct = parseFloat(document.getElementById('dTaxPct').value) || 0;
+  const fx = parseFloat(document.getElementById('dFx').value) || usdTry;
+  
+  const gross = grossPerShare * qty;
+  const tax = gross * (taxPct / 100);
+  const net = gross - tax;
+  const netUSD = fx > 0 ? net / fx : 0;
+  
+  document.getElementById('dPreviewGross').textContent = fTL(gross);
+  document.getElementById('dPreviewTax').textContent = fTL(tax);
+  document.getElementById('dPreviewNet').textContent = fTL(net);
+  document.getElementById('dPreviewUSD').textContent = fUSD(netUSD);
+}
+
+function saveDiv() {
+  const grossPerShare = parseFloat(document.getElementById('dGrossPerShare').value);
+  const qty = parseFloat(document.getElementById('dQty').value);
+  const taxPct = parseFloat(document.getElementById('dTaxPct').value) || 0;
+  const fx = parseFloat(document.getElementById('dFx').value) || usdTry;
+  const date = document.getElementById('dDate').value;
+  
+  if (isNaN(grossPerShare) || grossPerShare <= 0 || isNaN(qty) || qty <= 0) {
+    alert('Hisse başı brüt temettü ve lot sayısı zorunludur.');
+    return;
+  }
+  
+  const gross = grossPerShare * qty;
+  const tax = gross * (taxPct / 100);
+  const net = gross - tax;
+  const netUSD = fx > 0 ? net / fx : 0;
+  
+  if (!portfolio[panelIdx].dividends) portfolio[panelIdx].dividends = [];
+  portfolio[panelIdx].dividends.push({
+    date: date || today(),
+    grossPerShare,
+    qty,
+    withholdingPct: taxPct,
+    tax,
+    gross,
+    net,
+    fx,
+    netUSD
+  });
+  
+  persist();
+  closeDivModal();
+  render();
+  refreshPanel();
+}
+
+function delDiv(di) {
+  if (panelIdx < 0) return;
+  if (!confirm('Bu temettü kaydını silmek istediğinize emin misiniz?')) return;
+  portfolio[panelIdx].dividends.splice(di, 1);
+  persist();
+  render();
+  refreshPanel();
+}
+
+let detectedDividendsTemp = [];
+
+async function scanDividends() {
+  const btn = document.querySelector('.div-scan-btn');
+  const oldText = btn.textContent;
+  btn.textContent = 'Tarama yapılıyor…';
+  btn.disabled = true;
+  
+  try {
+    const allSymbols = portfolio.map(s => s.ticker);
+    if (allSymbols.length === 0) {
+      alert('Önce portföyünüze hisse eklemelisiniz.');
+      btn.textContent = oldText;
+      btn.disabled = false;
+      return;
+    }
+    
+    // Proxy URL normalization
+    let proxyBase = customProxy ? customProxy.trim() : '';
+    if (proxyBase && !proxyBase.endsWith('/') && !proxyBase.includes('?')) {
+      proxyBase += '/';
+    }
+    const buildProxyUrl = (targetUrl) => {
+      if (!proxyBase) return targetUrl;
+      if (proxyBase.includes('?')) {
+        if (proxyBase.endsWith('url=')) {
+          return proxyBase + encodeURIComponent(targetUrl);
+        } else if (proxyBase.includes('url=')) {
+          return proxyBase.replace('url=', 'url=' + encodeURIComponent(targetUrl));
+        } else {
+          return proxyBase + (proxyBase.endsWith('&') ? '' : '&') + 'url=' + encodeURIComponent(targetUrl);
+        }
+      } else {
+        return proxyBase + targetUrl;
+      }
+    };
+
+    console.log('Fetching USD/TRY exchange rate history...');
+    const usdUrl = buildProxyUrl('https://query2.finance.yahoo.com/v8/finance/chart/USDTRY=X?interval=1d&range=5y');
+    const usdRes = await fetch(usdUrl, { cache: 'no-cache' });
+    if (!usdRes.ok) throw new Error('USD/TRY geçmiş kurları çekilemedi.');
+    const usdJson = await usdRes.json();
+    const usdResult = usdJson?.chart?.result?.[0];
+    const usdMap = {};
+    if (usdResult) {
+      const ts = usdResult.timestamp || [];
+      const quotes = usdResult.indicators?.quote?.[0]?.close || [];
+      ts.forEach((t, idx) => {
+        const dStr = new Date(t * 1000).toISOString().split('T')[0];
+        if (quotes[idx] !== null && quotes[idx] !== undefined) {
+          usdMap[dStr] = quotes[idx];
+        }
+      });
+    }
+    
+    const getHistoricalFxLocal = (dateStr) => {
+      if (usdMap[dateStr]) return usdMap[dateStr];
+      let d = new Date(dateStr);
+      for (let i = 1; i <= 7; i++) {
+        d.setDate(d.getDate() - 1);
+        const prevStr = d.toISOString().split('T')[0];
+        if (usdMap[prevStr]) return usdMap[prevStr];
+      }
+      return usdTry;
+    };
+    
+    console.log('Fetching stock dividend histories...');
+    const fetchPromises = portfolio.map(async (s, i) => {
+      try {
+        const url = buildProxyUrl(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s.ticker)}?interval=1d&range=5y&events=div`);
+        const res = await fetch(url, { cache: 'no-cache' });
+        if (!res.ok) return { index: i, error: res.status };
+        const data = await res.json();
+        const divs = data?.chart?.result?.[0]?.events?.dividends || {};
+        return { index: i, dividends: divs };
+      } catch (err) {
+        return { index: i, error: err.message };
+      }
+    });
+    
+    const results = await Promise.all(fetchPromises);
+    detectedDividendsTemp = [];
+    
+    results.forEach(res => {
+      if (res.error) return;
+      const s = portfolio[res.index];
+      const divs = res.dividends;
+      
+      Object.values(divs).forEach(div => {
+        const divDateStr = new Date(div.date * 1000).toISOString().split('T')[0];
+        
+        let lotsCount = 0;
+        if (s.lots) {
+          s.lots.forEach(l => {
+            if (!l.date || l.date <= divDateStr) {
+              lotsCount += (l.qty || 0);
+            }
+          });
+        }
+        
+        if (lotsCount > 0) {
+          const exists = (s.dividends || []).some(d => d.date === divDateStr);
+          if (!exists) {
+            const grossPerShare = div.amount;
+            const gross = grossPerShare * lotsCount;
+            const tax = gross * 0.15;
+            const net = gross - tax;
+            const fx = getHistoricalFxLocal(divDateStr);
+            const netUSD = fx > 0 ? net / fx : 0;
+            
+            detectedDividendsTemp.push({
+              stockIndex: res.index,
+              ticker: s.ticker.replace('.IS', ''),
+              date: divDateStr,
+              grossPerShare,
+              qty: lotsCount,
+              withholdingPct: 15,
+              tax,
+              gross,
+              net,
+              fx,
+              netUSD
+            });
+          }
+        }
+      });
+    });
+    
+    if (detectedDividendsTemp.length === 0) {
+      alert('Yeni temettü ödemesi bulunamadı. Tüm temettüleriniz güncel!');
+    } else {
+      openDivScanModal();
+    }
+  } catch (err) {
+    alert('Tarama sırasında hata oluştu: ' + err.message);
+  } finally {
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+}
+
+function openDivScanModal() {
+  const tbody = document.getElementById('divScanTableBody');
+  tbody.innerHTML = '';
+  
+  detectedDividendsTemp.forEach((d, idx) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="checkbox" class="scan-checkbox" data-idx="${idx}" checked></td>
+      <td>${fDate(d.date)}</td>
+      <td style="font-weight:bold;">${d.ticker}</td>
+      <td>${fTL(d.grossPerShare)}</td>
+      <td>${fmt(d.qty)}</td>
+      <td style="font-weight:600;color:var(--teal)">${fTL(d.net)}</td>
+      <td style="color:var(--blue)">${fUSD(d.netUSD)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+  
+  document.getElementById('scanSelectAll').checked = true;
+  document.getElementById('divScanOverlay').classList.add('open');
+}
+
+function closeDivScanModal() {
+  document.getElementById('divScanOverlay').classList.remove('open');
+}
+
+function toggleSelectAllScan() {
+  const mainCb = document.getElementById('scanSelectAll');
+  const cbs = document.querySelectorAll('.scan-checkbox');
+  cbs.forEach(cb => cb.checked = mainCb.checked);
+}
+
+function saveScanResults() {
+  const cbs = document.querySelectorAll('.scan-checkbox');
+  let addedCount = 0;
+  
+  cbs.forEach(cb => {
+    if (cb.checked) {
+      const idx = parseInt(cb.getAttribute('data-idx'));
+      const d = detectedDividendsTemp[idx];
+      const s = portfolio[d.stockIndex];
+      if (!s.dividends) s.dividends = [];
+      s.dividends.push({
+        date: d.date,
+        grossPerShare: d.grossPerShare,
+        qty: d.qty,
+        withholdingPct: d.withholdingPct,
+        tax: d.tax,
+        gross: d.gross,
+        net: d.net,
+        fx: d.fx,
+        netUSD: d.netUSD
+      });
+      addedCount++;
+    }
+  });
+  
+  if (addedCount > 0) {
+    persist();
+    render();
+    alert(`${addedCount} adet temettü ödemesi portföyünüze başarıyla kaydedildi!`);
+  }
+  closeDivScanModal();
+}
+
+function renderDividends() {
+  let totGross = 0, totNet = 0, totUSD = 0, totCost = 0;
+  let hasDividendsAny = false;
+  
+  portfolio.forEach(s => {
+    const c = calc(s);
+    totCost += c.totalCostTL;
+  });
+
+  const tbody = document.getElementById('divTableBody');
+  if (tbody) tbody.innerHTML = '';
+  
+  let allDivs = [];
+  
+  portfolio.forEach((s, i) => {
+    const c = calc(s);
+    const dSum = calcDivSummary(s);
+    
+    if ((s.dividends || []).length > 0) {
+      hasDividendsAny = true;
+      totGross += dSum.totalGross;
+      totNet += dSum.totalNet;
+      totUSD += dSum.totalUSD;
+      
+      const col = s.color || COLORS[i % COLORS.length];
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td style="font-weight:bold;color:${col};cursor:pointer" onclick="openPanel(${i})">${s.ticker.replace('.IS', '')}</td>
+        <td>${fmt(c.totalQty)}</td>
+        <td>${fTL(dSum.totalGross)}</td>
+        <td style="font-weight:600;color:var(--teal)">${fTL(dSum.totalNet)}</td>
+        <td style="color:var(--blue)">${fUSD(dSum.totalUSD)}</td>
+        <td>${fTL(c.totalCostTL)}</td>
+        <td style="font-weight:bold;color:var(--teal)">${dSum.yoc !== null ? fmtN(dSum.yoc, 2, 2) + '%' : '—'}</td>
+      `;
+      if (tbody) tbody.appendChild(row);
+      
+      s.dividends.forEach((d, di) => {
+        allDivs.push({
+          date: d.date || '—',
+          ticker: s.ticker.replace('.IS', ''),
+          color: col,
+          grossPerShare: d.grossPerShare || 0,
+          qty: d.qty || 0,
+          gross: d.gross || 0,
+          tax: d.tax || 0,
+          net: d.net || 0,
+          netUSD: d.netUSD || 0,
+          stockIndex: i,
+          divIndex: di
+        });
+      });
+    }
+  });
+  
+  if (hasDividendsAny) {
+    const totalYoC = totCost > 0 ? (totNet / totCost) * 100 : 0;
+    const row = document.createElement('tr');
+    row.style.fontWeight = 'bold';
+    row.style.background = 'var(--bg2)';
+    row.innerHTML = `
+      <td>TOPLAM</td>
+      <td>—</td>
+      <td>${fTL(totGross)}</td>
+      <td style="color:var(--teal)">${fTL(totNet)}</td>
+      <td style="color:var(--blue)">${fUSD(totUSD)}</td>
+      <td>${fTL(totCost)}</td>
+      <td style="color:var(--teal)">${fmtN(totalYoC, 2, 2)}%</td>
+    `;
+    if (tbody) tbody.appendChild(row);
+  } else {
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>';
+  }
+  
+  const totalYoCPort = totCost > 0 ? (totNet / totCost) * 100 : 0;
+  const elSumGross = document.getElementById('dSumGross');
+  if (elSumGross) elSumGross.textContent = fTL(totGross);
+  const elSumNet = document.getElementById('dSumNet');
+  if (elSumNet) elSumNet.textContent = fTL(totNet);
+  const elSumUSD = document.getElementById('dSumUSD');
+  if (elSumUSD) elSumUSD.textContent = fUSD(totUSD);
+  const elSumYoC = document.getElementById('dSumYoC');
+  if (elSumYoC) elSumYoC.textContent = hasDividendsAny ? fmtN(totalYoCPort, 2, 2) + '%' : '—';
+  
+  const elSumNetSub = document.getElementById('dSumNetSub');
+  if (elSumNetSub) elSumNetSub.textContent = totCost > 0 ? 'Maliyet %' + fmtN(totalYoCPort, 2, 2) : 'Maliyet % —';
+
+  allDivs.sort((a, b) => b.date.localeCompare(a.date));
+  
+  const histTbody = document.getElementById('divHistoryTableBody');
+  if (histTbody) {
+    histTbody.innerHTML = '';
+    if (allDivs.length > 0) {
+      allDivs.forEach(d => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${fDate(d.date)}</td>
+          <td style="font-weight:bold;color:${d.color};cursor:pointer" onclick="openPanel(${d.stockIndex})">${d.ticker}</td>
+          <td>${fTL(d.grossPerShare)}</td>
+          <td>${fmt(d.qty)}</td>
+          <td>${fTL(d.gross)}</td>
+          <td style="color:var(--red)">${fTL(d.tax)}</td>
+          <td style="font-weight:600;color:var(--teal)">${fTL(d.net)}</td>
+          <td style="color:var(--blue)">${fUSD(d.netUSD)}</td>
+        `;
+        histTbody.appendChild(row);
+      });
+    } else {
+      histTbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Geçmiş ödeme yok.</td></tr>';
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
