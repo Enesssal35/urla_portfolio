@@ -403,8 +403,31 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
     </table>
   </div>
 
+  <div style="font-family:var(--mono);font-size:9px;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-top:10px;border-top:1px solid var(--border)">
+    🔮 Gelecek / Beklenen Temettü Ödemeleri (3 Haziran 2026 Sonrası)
+  </div>
+  <div style="overflow-x:auto;max-height:200px;overflow-y:auto;margin-bottom:14px;">
+    <table class="lot-table" id="divUpcomingTable" style="width:100%;min-width:600px;">
+      <thead>
+        <tr>
+          <th>Verileceği Tarih</th>
+          <th>Hisse</th>
+          <th>Hisse Başı</th>
+          <th>Hak Edilen Lot</th>
+          <th>Toplam Brüt</th>
+          <th>Stopaj (%15)</th>
+          <th>Toplam Net</th>
+          <th>Net (USD)</th>
+        </tr>
+      </thead>
+      <tbody id="divUpcomingTableBody">
+        <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Beklenen ödeme bulunamadı.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-top:10px;border-top:1px solid var(--border)">
-    Kronolojik Ödemeler
+    Geçmiş Temettü Dağıtımları (3 Haziran 2026 Öncesi)
   </div>
   <div style="overflow-x:auto;max-height:200px;overflow-y:auto;">
     <table class="lot-table" id="divHistoryTable" style="width:100%;min-width:600px;">
@@ -1349,12 +1372,28 @@ function saveLot() {
 // ══════════════════════════════════════════════════════════════
 function calcDivSummary(s) {
   const divs = s.dividends || [];
-  const totalGross = divs.reduce((a, d) => a + (d.gross || 0), 0);
-  const totalNet = divs.reduce((a, d) => a + (d.net || 0), 0);
-  const totalUSD = divs.reduce((a, d) => a + (d.netUSD || 0), 0);
+  const cutoffDate = '2026-06-03';
+  
+  let totalGross = 0, totalNet = 0, totalUSD = 0;
+  let upGross = 0, upNet = 0, upUSD = 0;
+  
+  divs.forEach(d => {
+    if ((d.date || '') > cutoffDate) {
+      upGross += (d.gross || 0);
+      upNet += (d.net || 0);
+      upUSD += (d.netUSD || 0);
+    } else {
+      totalGross += (d.gross || 0);
+      totalNet += (d.net || 0);
+      totalUSD += (d.netUSD || 0);
+    }
+  });
+  
   const c = calc(s);
   const yoc = c.totalCostTL > 0 ? (totalNet / c.totalCostTL) * 100 : null;
-  return {totalGross, totalNet, totalUSD, yoc};
+  const upYoc = c.totalCostTL > 0 ? (upNet / c.totalCostTL) * 100 : null;
+  
+  return {totalGross, totalNet, totalUSD, yoc, upGross, upNet, upUSD, upYoc};
 }
 
 function openDivModal() {
@@ -1810,7 +1849,7 @@ async function autoScanDividendsSilent() {
     if (changeCount > 0) {
       persist();
       render();
-      showToast(`🤖 Canlı Temettü Güncellemesi: ${changeCount} adet temettü ödemesi arka planda otomatik güncellendi!`);
+      showToast(`🤖 Canlı Temettü Güncellemesi: ${changeCount} adet temettü kaydı otomatik güncellendi!`);
     }
   } catch (e) {
     console.error('Arkaplan temettü tarama hatası:', e);
@@ -1873,6 +1912,7 @@ function showToast(msg) {
 
 function renderDividends() {
   let totGross = 0, totNet = 0, totUSD = 0, totCost = 0;
+  let upGross = 0, upNet = 0, upUSD = 0;
   let hasDividendsAny = false;
   
   portfolio.forEach(s => {
@@ -1894,6 +1934,10 @@ function renderDividends() {
     totGross += dSum.totalGross;
     totNet += dSum.totalNet;
     totUSD += dSum.totalUSD;
+    
+    upGross += dSum.upGross;
+    upNet += dSum.upNet;
+    upUSD += dSum.upUSD;
     
     const col = s.color || COLORS[i % COLORS.length];
     const row = document.createElement('tr');
@@ -1937,11 +1981,10 @@ function renderDividends() {
       <td>TOPLAM</td>
       <td>—</td>
       <td>—</td>
-      <td>${fTL(totGross)}</td>
-      <td style="color:var(--teal)">${fTL(totNet)}</td>
-      <td style="color:var(--blue)">${fUSD(totUSD)}</td>
+      <td>${totGross > 0 ? fTL(totGross) : '—'}</td>
+      <td style="color:var(--teal)">${totNet > 0 ? fTL(totNet) : '—'}</td>
+      <td style="color:var(--blue)">${totUSD > 0 ? fUSD(totUSD) : '—'}</td>
       <td>${fTL(totCost)}</td>
-      <td style="color:var(--teal)">${fmtN(totalYoC, 2, 2)}%</td>
     `;
     if (tbody) tbody.appendChild(row);
   } else {
