@@ -1719,7 +1719,7 @@ function saveScanResults() {
 // ── CANLI VE SESSİZ TEMETTÜ TARAMA MOTORU ──
 async function autoScanDividendsSilent() {
   try {
-    const allSymbols = portfolio.map(s => s.ticker);
+    const allSymbols = portfolio.filter(s => (s.lots||[]).some(l => (l.qty||0) > 0)).map(s => s.ticker);
     if (allSymbols.length === 0) return;
     
     // Proxy URL normalizasyonu
@@ -1738,22 +1738,30 @@ async function autoScanDividendsSilent() {
       }
     };
 
-    // USD/TRY Geçmiş Kurlarını Çek
-    const usdUrl = buildProxyUrl('https://query2.finance.yahoo.com/v8/finance/chart/USDTRY=X?interval=1d&range=5y');
-    const usdRes = await fetch(usdUrl, { cache: 'no-cache' });
-    if (!usdRes.ok) return;
-    const usdJson = await usdRes.json();
-    const usdResult = usdJson?.chart?.result?.[0];
+    // USD/TRY Geçmiş Kurlarını Çek — başarısız olsa da devam et
     const usdMap = {};
-    if (usdResult) {
-      const ts = usdResult.timestamp || [];
-      const quotes = usdResult.indicators?.quote?.[0]?.close || [];
-      ts.forEach((t, idx) => {
-        const dStr = new Date(t * 1000).toISOString().split('T')[0];
-        if (quotes[idx] !== null && quotes[idx] !== undefined) {
-          usdMap[dStr] = quotes[idx];
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      const usdUrl = buildProxyUrl('https://query2.finance.yahoo.com/v8/finance/chart/USDTRY=X?interval=1d&range=5y');
+      const usdRes = await fetch(usdUrl, { cache: 'no-cache', signal: ctrl.signal });
+      clearTimeout(tid);
+      if (usdRes.ok) {
+        const usdJson = await usdRes.json();
+        const usdResult = usdJson?.chart?.result?.[0];
+        if (usdResult) {
+          const ts = usdResult.timestamp || [];
+          const quotes = usdResult.indicators?.quote?.[0]?.close || [];
+          ts.forEach((t, idx) => {
+            const dStr = new Date(t * 1000).toISOString().split('T')[0];
+            if (quotes[idx] !== null && quotes[idx] !== undefined) {
+              usdMap[dStr] = quotes[idx];
+            }
+          });
         }
-      });
+      }
+    } catch(e) {
+      console.warn('USD/TRY geçmiş kur alınamadı, mevcut kur kullanılacak:', usdTry);
     }
 
     const getHistoricalFxLocal = (dateStr) => {
@@ -1764,92 +1772,87 @@ async function autoScanDividendsSilent() {
         const prevStr = d.toISOString().split('T')[0];
         if (usdMap[prevStr]) return usdMap[prevStr];
       }
-      return usdTry;
+      return usdTry; // Fallback: güncel kur
     };
 
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    // Tüm hisselerin temettü geçmişini çek
-    const fetchPromises = portfolio.map(async (s, i) => {
-      try {
-        const url = buildProxyUrl(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s.ticker)}?interval=1d&range=5y&events=div`);
-        const res = await fetch(url, { cache: 'no-cache' });
-        if (!res.ok) return null;
-        const data = await res.json();
-        const divs = data?.chart?.result?.[0]?.events?.dividends || {};
-        return { index: i, dividends: divs };
-      } catch (err) {
-        return null;
-      }
-    });
-
-    const results = await Promise.all(fetchPromises);
     let changeCount = 0;
 
-    results.forEach(res => {
-      if (!res) return;
-      const s = portfolio[res.index];
-      const divs = res.dividends;
+    // Hisseleri SIRASIZ çek (rate limit'e takılmamak için kısa bekleme)
+    for (const s of portfolio) {
+      if (!(s.lots||[]).some(l => (l.qty||0) > 0)) continue; // Lot yoksa geç
 
-      Object.values(divs).forEach(div => {
-        const divDateStr = new Date(div.date * 1000).toISOString().split('T')[0];
-        
-        let lotsCount = 0;
-        if (s.lots) {
-          s.lots.forEach(l => {
-            if (ignoreDivDates || !l.date || l.date <= divDateStr) {
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 10000);
+        const url = buildProxyUrl(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s.ticker)}?interval=1d&range=5y&events=div`);
+        const res = await fetch(url, { cache: 'no-cache', signal: ctrl.signal });
+        clearTimeout(tid);
+        if (!res.ok) continue;
+        const data = await res.json();
+        const divs = data?.chart?.result?.[0]?.events?.dividends || {};
+
+        Object.values(divs).forEach(div => {
+          const divDateStr = new Date(div.date * 1000).toISOString().split('T')[0];
+          
+          // Auto-scan her zaman tüm lotları sayar (ignoreDivDates=true gibi davranır)
+          let lotsCount = 0;
+          if (s.lots) {
+            s.lots.forEach(l => {
               lotsCount += (l.qty || 0);
-            }
-          });
-        }
-
-        if (lotsCount > 0) {
-          if (!s.dividends) s.dividends = [];
-          const existingIdx = s.dividends.findIndex(d => d.date === divDateStr);
-
-          const grossPerShare = div.amount;
-          const gross = grossPerShare * lotsCount;
-          const tax = gross * 0.15;
-          const net = gross - tax;
-          const fx = getHistoricalFxLocal(divDateStr);
-          const netUSD = fx > 0 ? net / fx : 0;
-
-          if (existingIdx === -1) {
-            // Yeni temettü kaydı bulundu, otomatik ekle
-            s.dividends.push({
-              date: divDateStr,
-              grossPerShare,
-              qty: lotsCount,
-              withholdingPct: 15,
-              tax,
-              gross,
-              net,
-              fx,
-              netUSD
             });
-            changeCount++;
-          } else {
-            // Var olan temettü. Eğer gelecek bir tarihte ise veya lot miktarı alımlarla değiştiyse güncelle
-            const ext = s.dividends[existingIdx];
-            if (ext.qty !== lotsCount || ext.grossPerShare !== grossPerShare) {
-              ext.qty = lotsCount;
-              ext.grossPerShare = grossPerShare;
-              ext.gross = gross;
-              ext.tax = tax;
-              ext.net = net;
-              ext.fx = fx;
-              ext.netUSD = netUSD;
+          }
+
+          if (lotsCount > 0) {
+            if (!s.dividends) s.dividends = [];
+            const existingIdx = s.dividends.findIndex(d => d.date === divDateStr);
+
+            const grossPerShare = div.amount;
+            const gross = grossPerShare * lotsCount;
+            const tax = gross * 0.15;
+            const net = gross - tax;
+            const fx = getHistoricalFxLocal(divDateStr);
+            const netUSD = fx > 0 ? net / fx : 0;
+
+            if (existingIdx === -1) {
+              s.dividends.push({
+                date: divDateStr,
+                grossPerShare,
+                qty: lotsCount,
+                withholdingPct: 15,
+                tax,
+                gross,
+                net,
+                fx,
+                netUSD
+              });
               changeCount++;
+            } else {
+              const ext = s.dividends[existingIdx];
+              if (ext.qty !== lotsCount || Math.abs(ext.grossPerShare - grossPerShare) > 0.0001) {
+                ext.qty = lotsCount;
+                ext.grossPerShare = grossPerShare;
+                ext.gross = gross;
+                ext.tax = tax;
+                ext.net = net;
+                ext.fx = fx;
+                ext.netUSD = netUSD;
+                changeCount++;
+              }
             }
           }
-        }
-      });
-    });
+        });
+      } catch (err) {
+        console.warn('Temettü tarama hatası:', s.ticker, err.message);
+      }
+
+      // Rate limit'e takılmamak için 150ms bekle
+      await new Promise(r => setTimeout(r, 150));
+    }
 
     if (changeCount > 0) {
       persist();
       render();
-      showToast(`🤖 Canlı Temettü Güncellemesi: ${changeCount} adet temettü kaydı otomatik güncellendi!`);
+      showToast('🤖 Canlı Temettü Güncellemesi: ' + changeCount + ' adet temettü kaydı otomatik güncellendi!');
     }
   } catch (e) {
     console.error('Arkaplan temettü tarama hatası:', e);
