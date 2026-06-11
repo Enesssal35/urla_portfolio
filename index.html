@@ -377,10 +377,10 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;" id="divSumGrid">
-    <div class="scard"><div class="scard-bar" style="background:var(--teal)"></div><div class="sc-lbl">Toplam Brüt Temettü</div><div class="sc-val" id="dSumGross">—</div><div class="sc-sub">TL bazlı brüt toplam</div></div>
+    <div class="scard"><div class="scard-bar" style="background:var(--teal)"></div><div class="sc-lbl">Toplam Brüt Temettü</div><div class="sc-val" id="dSumGross">—</div><div class="sc-sub" id="dSumGrossSub">TL bazlı brüt toplam</div></div>
     <div class="scard"><div class="scard-bar" style="background:var(--teal)"></div><div class="sc-lbl">Toplam Net Temettü</div><div class="sc-val" id="dSumNet">—</div><div class="sc-sub" id="dSumNetSub">Maliyet % —</div></div>
-    <div class="scard"><div class="scard-bar" style="background:var(--blue)"></div><div class="sc-lbl">Toplam Net (USD)</div><div class="sc-val" id="dSumUSD">—</div><div class="sc-sub">Ödeme kurlarıyla</div></div>
-    <div class="scard"><div class="scard-bar" style="background:var(--purple)"></div><div class="sc-lbl">Temettü Verimi (YoC)</div><div class="sc-val" id="dSumYoC">—</div><div class="sc-sub">Toplam Net / Maliyet %</div></div>
+    <div class="scard"><div class="scard-bar" style="background:var(--blue)"></div><div class="sc-lbl">Toplam Net (USD)</div><div class="sc-val" id="dSumUSD">—</div><div class="sc-sub" id="dSumUSDSub">Ödeme kurlarıyla</div></div>
+    <div class="scard"><div class="scard-bar" style="background:var(--purple)"></div><div class="sc-lbl">Temettü Verimi (YoC)</div><div class="sc-val" id="dSumYoC">—</div><div class="sc-sub" id="dSumYoCSub">Toplam Net / Maliyet %</div></div>
   </div>
 
   <div style="overflow-x:auto;margin-bottom:18px;">
@@ -1930,7 +1930,9 @@ function renderDividends() {
     const dSum = calcDivSummary(s);
     const hasDivs = (s.dividends || []).length > 0;
     
-    hasDividendsAny = true;
+    if (hasDivs) {
+      hasDividendsAny = true;
+    }
     totGross += dSum.totalGross;
     totNet += dSum.totalNet;
     totUSD += dSum.totalUSD;
@@ -1985,13 +1987,16 @@ function renderDividends() {
       <td style="color:var(--teal)">${totNet > 0 ? fTL(totNet) : '—'}</td>
       <td style="color:var(--blue)">${totUSD > 0 ? fUSD(totUSD) : '—'}</td>
       <td>${fTL(totCost)}</td>
+      <td style="font-weight:bold;color:var(--teal)">${totalYoC > 0 ? fmtN(totalYoC, 2, 2) + '%' : '—'}</td>
     `;
     if (tbody) tbody.appendChild(row);
   } else {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>';
   }
   
   const totalYoCPort = totCost > 0 ? (totNet / totCost) * 100 : 0;
+  const upYoCPort = totCost > 0 ? (upNet / totCost) * 100 : 0;
+
   const elSumGross = document.getElementById('dSumGross');
   if (elSumGross) elSumGross.textContent = fTL(totGross);
   const elSumNet = document.getElementById('dSumNet');
@@ -2001,16 +2006,50 @@ function renderDividends() {
   const elSumYoC = document.getElementById('dSumYoC');
   if (elSumYoC) elSumYoC.textContent = hasDividendsAny ? fmtN(totalYoCPort, 2, 2) + '%' : '—';
   
+  const elSumGrossSub = document.getElementById('dSumGrossSub');
+  if (elSumGrossSub) elSumGrossSub.textContent = `Gelecek: +${fTL(upGross)}`;
   const elSumNetSub = document.getElementById('dSumNetSub');
-  if (elSumNetSub) elSumNetSub.textContent = totCost > 0 ? 'Maliyet %' + fmtN(totalYoCPort, 2, 2) : 'Maliyet % —';
+  if (elSumNetSub) elSumNetSub.textContent = totCost > 0 ? `Maliyet %${fmtN(totalYoCPort, 2, 2)} (Gelecek: +${fTL(upNet)})` : `Maliyet % — (Gelecek: +${fTL(upNet)})`;
+  const elSumUSDSub = document.getElementById('dSumUSDSub');
+  if (elSumUSDSub) elSumUSDSub.textContent = `Gelecek: +${fUSD(upUSD)}`;
+  const elSumYoCSub = document.getElementById('dSumYoCSub');
+  if (elSumYoCSub) elSumYoCSub.textContent = `Gelecek YoC: %${fmtN(upYoCPort, 2, 2)}`;
 
-  allDivs.sort((a, b) => b.date.localeCompare(a.date));
+  const cutoffDate = '2026-06-03';
+  const pastDivs = allDivs.filter(d => d.date <= cutoffDate);
+  const upcomingDivs = allDivs.filter(d => d.date > cutoffDate);
+
+  upcomingDivs.sort((a, b) => a.date.localeCompare(b.date));
+  pastDivs.sort((a, b) => b.date.localeCompare(a.date));
   
+  const upcomingTbody = document.getElementById('divUpcomingTableBody');
+  if (upcomingTbody) {
+    upcomingTbody.innerHTML = '';
+    if (upcomingDivs.length > 0) {
+      upcomingDivs.forEach(d => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${fDate(d.date)}</td>
+          <td style="font-weight:bold;color:${d.color};cursor:pointer" onclick="openPanel(${d.stockIndex})">${d.ticker}</td>
+          <td>${fTL(d.grossPerShare)}</td>
+          <td>${fmt(d.qty)}</td>
+          <td>${fTL(d.gross)}</td>
+          <td style="color:var(--red)">${fTL(d.tax)}</td>
+          <td style="font-weight:600;color:var(--teal)">${fTL(d.net)}</td>
+          <td style="color:var(--blue)">${fUSD(d.netUSD)}</td>
+        `;
+        upcomingTbody.appendChild(row);
+      });
+    } else {
+      upcomingTbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Beklenen ödeme bulunamadı.</td></tr>';
+    }
+  }
+
   const histTbody = document.getElementById('divHistoryTableBody');
   if (histTbody) {
     histTbody.innerHTML = '';
-    if (allDivs.length > 0) {
-      allDivs.forEach(d => {
+    if (pastDivs.length > 0) {
+      pastDivs.forEach(d => {
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${fDate(d.date)}</td>
