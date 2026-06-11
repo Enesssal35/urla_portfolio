@@ -404,48 +404,31 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
     </table>
   </div>
 
-  <div style="font-family:var(--mono);font-size:9px;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-top:10px;border-top:1px solid var(--border)">
-    🔮 Gelecek / Beklenen Temettü Ödemeleri (3 Haziran 2026 Sonrası)
+  <!-- 📅 GELECEK TEMETTÜ TAKVİMİ -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px;">
+    <div style="font-family:var(--mono);font-size:9px;color:var(--teal);text-transform:uppercase;letter-spacing:1.5px;display:flex;align-items:center;gap:7px;">
+      <span style="width:8px;height:8px;background:var(--teal);border-radius:50%;display:inline-block;animation:pulse 2s infinite"></span>
+      📅 Gelecek Temettü Takvimi (3 Haziran 2026 Sonrası)
+    </div>
+    <div id="divFutureTotals" style="font-family:var(--mono);font-size:10px;color:var(--muted);"></div>
   </div>
-  <div style="overflow-x:auto;max-height:200px;overflow-y:auto;margin-bottom:14px;">
-    <table class="lot-table" id="divUpcomingTable" style="width:100%;min-width:600px;">
+  <div style="overflow-x:auto;">
+    <table class="lot-table" id="divFutureTable" style="width:100%;min-width:640px;">
       <thead>
         <tr>
-          <th>Verileceği Tarih</th>
+          <th style="color:var(--teal)">Verileceği Tarih</th>
           <th>Hisse</th>
-          <th>Hisse Başı</th>
-          <th>Hak Edilen Lot</th>
+          <th>Hisse Adı</th>
+          <th>Hisse Başı Brüt</th>
+          <th>Lot</th>
           <th>Toplam Brüt</th>
           <th>Stopaj (%15)</th>
-          <th>Toplam Net</th>
-          <th>Net (USD)</th>
+          <th style="color:var(--teal)">Toplam Net</th>
+          <th style="color:var(--blue)">Net (USD)</th>
         </tr>
       </thead>
-      <tbody id="divUpcomingTableBody">
-        <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Beklenen ödeme bulunamadı.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-top:10px;border-top:1px solid var(--border)">
-    Geçmiş Temettü Dağıtımları (3 Haziran 2026 Öncesi)
-  </div>
-  <div style="overflow-x:auto;max-height:200px;overflow-y:auto;">
-    <table class="lot-table" id="divHistoryTable" style="width:100%;min-width:600px;">
-      <thead>
-        <tr>
-          <th>Tarih</th>
-          <th>Hisse</th>
-          <th>Brüt (Hisse Başı)</th>
-          <th>Ödenen Lot</th>
-          <th>Toplam Brüt</th>
-          <th>Stopaj</th>
-          <th>Toplam Net</th>
-          <th>Net (USD)</th>
-        </tr>
-      </thead>
-      <tbody id="divHistoryTableBody">
-        <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Geçmiş ödeme yok.</td></tr>
+      <tbody id="divFutureTableBody">
+        <tr><td colspan="9" style="color:var(--muted);text-align:center;padding:20px;">⏳ Canlı tarama bekleniyor… (sayfa açıldıktan birkaç saniye sonra otomatik dolar)</td></tr>
       </tbody>
     </table>
   </div>
@@ -2028,56 +2011,57 @@ function renderDividends() {
   const elSumYoCSub = document.getElementById('dSumYoCSub');
   if (elSumYoCSub) elSumYoCSub.textContent = `Gelecek YoC: %${fmtN(upYoCPort, 2, 2)}`;
 
+  // ── Gelecek Temettü Takvimi tablosunu doldur ──
   const cutoffDate = '2026-06-03';
-  const pastDivs = allDivs.filter(d => d.date <= cutoffDate);
-  const upcomingDivs = allDivs.filter(d => d.date > cutoffDate);
+  const futureDivs = allDivs.filter(d => d.date > cutoffDate);
+  futureDivs.sort((a, b) => a.date.localeCompare(b.date)); // en yakın tarih üstte
 
-  upcomingDivs.sort((a, b) => a.date.localeCompare(b.date));
-  pastDivs.sort((a, b) => b.date.localeCompare(a.date));
-  
-  const upcomingTbody = document.getElementById('divUpcomingTableBody');
-  if (upcomingTbody) {
-    upcomingTbody.innerHTML = '';
-    if (upcomingDivs.length > 0) {
-      upcomingDivs.forEach(d => {
+  const futureTbody = document.getElementById('divFutureTableBody');
+  if (futureTbody) {
+    futureTbody.innerHTML = '';
+    if (futureDivs.length > 0) {
+      let futTotGross = 0, futTotNet = 0, futTotUSD = 0;
+      futureDivs.forEach(d => {
+        futTotGross += d.gross;
+        futTotNet   += d.net;
+        futTotUSD   += d.netUSD;
+        const stockName = (portfolio[d.stockIndex] || {}).name || '';
+        // Kaç gün kaldı?
+        const daysLeft = Math.ceil((new Date(d.date) - new Date()) / 86400000);
+        const daysTag = daysLeft >= 0
+          ? '<span style="font-size:9px;background:var(--teal-l);color:var(--teal);padding:1px 5px;border-radius:4px;margin-left:4px">' + daysLeft + ' gün</span>'
+          : '<span style="font-size:9px;background:var(--bg2);color:var(--muted);padding:1px 5px;border-radius:4px;margin-left:4px">geçti</span>';
         const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${fDate(d.date)}</td>
-          <td style="font-weight:bold;color:${d.color};cursor:pointer" onclick="openPanel(${d.stockIndex})">${d.ticker}</td>
-          <td>${fTL(d.grossPerShare)}</td>
-          <td>${fmt(d.qty)}</td>
-          <td>${fTL(d.gross)}</td>
-          <td style="color:var(--red)">${fTL(d.tax)}</td>
-          <td style="font-weight:600;color:var(--teal)">${fTL(d.net)}</td>
-          <td style="color:var(--blue)">${fUSD(d.netUSD)}</td>
-        `;
-        upcomingTbody.appendChild(row);
+        row.innerHTML =
+          '<td style="white-space:nowrap">' + fDate(d.date) + daysTag + '</td>' +
+          '<td style="font-weight:bold;color:' + d.color + ';cursor:pointer" onclick="openPanel(' + d.stockIndex + ')">' + d.ticker + '</td>' +
+          '<td style="font-size:10px;color:var(--ink2)">' + stockName + '</td>' +
+          '<td>' + fTL(d.grossPerShare) + '</td>' +
+          '<td>' + fmt(d.qty) + '</td>' +
+          '<td>' + fTL(d.gross) + '</td>' +
+          '<td style="color:var(--red)">' + fTL(d.tax) + '</td>' +
+          '<td style="font-weight:700;color:var(--teal)">' + fTL(d.net) + '</td>' +
+          '<td style="color:var(--blue)">' + fUSD(d.netUSD) + '</td>';
+        futureTbody.appendChild(row);
       });
-    } else {
-      upcomingTbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Beklenen ödeme bulunamadı.</td></tr>';
-    }
-  }
+      // TOPLAM satırı
+      const totRow = document.createElement('tr');
+      totRow.style.fontWeight = 'bold';
+      totRow.style.background = 'var(--teal-l)';
+      totRow.innerHTML =
+        '<td colspan="5" style="color:var(--teal)">GELECEK TOPLAM (' + futureDivs.length + ' ödeme)</td>' +
+        '<td>' + fTL(futTotGross) + '</td>' +
+        '<td style="color:var(--red)">' + fTL(futTotGross * 0.15) + '</td>' +
+        '<td style="color:var(--teal)">' + fTL(futTotNet) + '</td>' +
+        '<td style="color:var(--blue)">' + fUSD(futTotUSD) + '</td>';
+      futureTbody.appendChild(totRow);
 
-  const histTbody = document.getElementById('divHistoryTableBody');
-  if (histTbody) {
-    histTbody.innerHTML = '';
-    if (pastDivs.length > 0) {
-      pastDivs.forEach(d => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${fDate(d.date)}</td>
-          <td style="font-weight:bold;color:${d.color};cursor:pointer" onclick="openPanel(${d.stockIndex})">${d.ticker}</td>
-          <td>${fTL(d.grossPerShare)}</td>
-          <td>${fmt(d.qty)}</td>
-          <td>${fTL(d.gross)}</td>
-          <td style="color:var(--red)">${fTL(d.tax)}</td>
-          <td style="font-weight:600;color:var(--teal)">${fTL(d.net)}</td>
-          <td style="color:var(--blue)">${fUSD(d.netUSD)}</td>
-        `;
-        histTbody.appendChild(row);
-      });
+      const elFutTotals = document.getElementById('divFutureTotals');
+      if (elFutTotals) elFutTotals.textContent = futureDivs.length + ' beklenen odeme · Net: ' + fTL(futTotNet) + ' / ' + fUSD(futTotUSD);
     } else {
-      histTbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Geçmiş ödeme yok.</td></tr>';
+      futureTbody.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:20px;">Henuz gelecek temettü kaydedilmedi. Otomatik tarama bekleniyor…</td></tr>';
+      const elFutTotals = document.getElementById('divFutureTotals');
+      if (elFutTotals) elFutTotals.textContent = '';
     }
   }
 }
