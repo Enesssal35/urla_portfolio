@@ -615,6 +615,42 @@ async function fetchLivePrices() {
   const allSymbols = [...portfolio.map(s => s.ticker), 'USDTRY=X'];
   let successCount = 0;
 
+  // ── 0. BULK PROXY (AllOrigins — Tıklandığında veya ilk açılışta canlı deneme) ──
+  try {
+    const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(allSymbols.join(','))}`;
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(proxyUrl, { signal: ctrl.signal, cache: 'no-cache' });
+    clearTimeout(tid);
+    if (res.ok) {
+      const data = await res.json();
+      const result = data?.quoteResponse?.result || [];
+      if (result.length > 0) {
+        result.forEach(q => {
+          const sym = q.symbol;
+          if (sym === 'USDTRY=X') {
+            if (q.regularMarketPrice > 1) { usdTry = q.regularMarketPrice; localStorage.setItem('avFx', usdTry); }
+          } else {
+            const stock = portfolio.find(s => s.ticker === sym);
+            if (stock && q.regularMarketPrice > 0) {
+              stock.price = q.regularMarketPrice;
+              stock.dayChange = q.regularMarketChange || 0;
+              stock.dayChangePct = q.regularMarketChangePercent || 0;
+              successCount++;
+            }
+          }
+        });
+        if (successCount > 0) {
+          lastUpdate = new Date();
+          console.log('Bulk proxy başarılı:', successCount, 'hisse yüklendi');
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('Bulk proxy başarısız, prices.json denenecek:', e.message);
+  }
+
   const applyFromJson = (data) => {
     const prices = data.prices || {};
     allSymbols.forEach(sym => {
@@ -630,7 +666,6 @@ async function fetchLivePrices() {
         }
       }
     });
-    // prices.json'daki güncelleme zamanını kullan
     if (data.updated) lastUpdate = new Date(data.updated);
   };
 
@@ -652,12 +687,14 @@ async function fetchLivePrices() {
   };
 
   // ── 1. ANA: prices.json (GitHub Actions — her cihazda çalışır!) ──
-  try {
-    const data = await fetchFromPricesJson();
-    applyFromJson(data);
-    console.log('prices.json başarılı:', successCount, 'hisse yüklendi');
-  } catch(e) {
-    console.warn('prices.json okunamadı:', e.message);
+  if (successCount === 0) {
+    try {
+      const data = await fetchFromPricesJson();
+      applyFromJson(data);
+      console.log('prices.json başarılı:', successCount, 'hisse yüklendi');
+    } catch(e) {
+      console.warn('prices.json okunamadı:', e.message);
+    }
   }
 
   // ── 2. YEDEK: Direkt Yahoo Finance (localhost/crumb — sadece desktop) ──
