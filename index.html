@@ -388,6 +388,12 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
       <div class="fg h"><label class="flbl">Ticker</label><input id="fTicker" placeholder="EGEEN" style="text-transform:uppercase"></div>
       <div class="fg h"><label class="flbl">Sektör</label><input id="fSector" placeholder="Otomotiv"></div>
     </div>
+    <div class="frow" style="margin-top:-8px;margin-bottom:8px">
+      <div class="fg h" style="flex-direction:row;align-items:center;gap:6px">
+        <input type="checkbox" id="fBist" checked style="width:16px;height:16px;cursor:pointer">
+        <label for="fBist" style="font-size:11px;color:var(--ink2);cursor:pointer;user-select:none">Borsa İstanbul (BIST) Hissesi (.IS otomatik eklenir)</label>
+      </div>
+    </div>
     <div class="fg"><label class="flbl">Şirket Adı</label><input id="fName" placeholder="Ege Endüstri"></div>
     <div class="frow">
       <div class="fg h"><label class="flbl">Hedef % (Portföy)</label><input type="number" id="fTarget" placeholder="12"></div>
@@ -472,9 +478,9 @@ const COLORS = ['#0a9e7a','#2055cc','#c08000','#6b3fcc','#e06020','#1a8fa0','#d9
 
 // Yahoo Finance — toplu quote endpoint (tek istekte tüm hisseler)
 const PROXIES = [
+  'https://api.codetabs.com/v1/proxy?quest=',
   'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
-  'https://api.codetabs.com/v1/proxy?quest='
+  'https://api.allorigins.win/raw?url='
 ];
 
 // v7 quote API: tek istekte çoklu sembol
@@ -483,26 +489,31 @@ const YF_QUOTE = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=';
 const YF_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 
 const DEFAULTS = [
-  {ticker:'EGEEN', name:'Ege Endüstri',              sector:'Otomotiv Yan San. / İhracat', price:0, target:12, size:'xl', color:'#0a9e7a', lots:[]},
-  {ticker:'FROTO', name:'Ford Otosan',                sector:'Otomotiv / İhracat',          price:0, target:12, size:'xl', color:'#2055cc', lots:[]},
-  {ticker:'OTKAR', name:'Otokar',                     sector:'Savunma Sanayi',              price:0, target:10, size:'lg', color:'#c08000', lots:[]},
-  {ticker:'PGSUS', name:'Pegasus Hava Taşımacılığı',  sector:'Havacılık / Turizm',          price:0, target:7,  size:'lg', color:'#6b3fcc', lots:[]},
-  {ticker:'BRSAN', name:'Borusan Boru Sanayi',        sector:'Çelik / Enerji Altyapısı',   price:0, target:9,  size:'lg', color:'#e06020', lots:[]},
-  {ticker:'CLEBI', name:'Çelebi Hava Servisi',        sector:'Havacılık Hizmetleri',        price:0, target:9,  size:'md', color:'#1a8fa0', lots:[]},
-  {ticker:'ISMEN', name:'İş Yatırım Menkul Değ.',     sector:'Finans',                      price:0, target:7,  size:'md', color:'#0a9e7a', lots:[]},
-  {ticker:'ANSGR', name:'Anadolu Sigorta',            sector:'Sigorta',                     price:0, target:7,  size:'md', color:'#2055cc', lots:[]},
-  {ticker:'LOGO',  name:'Logo Yazılım',               sector:'Yazılım / Teknoloji',          price:0, target:7,  size:'md', color:'#d94040', lots:[]},
-  {ticker:'SODSN', name:'Sodaş Sodyum Sanayi',        sector:'Kimya',                       price:0, target:6,  size:'md', color:'#c08000', lots:[]},
-  {ticker:'LKMNH',  name:'Lokman Hekim',               sector:'Sağlık',                      price:0, target:6,  size:'md', color:'#5a8040', lots:[]},
-  {ticker:'ALKA',  name:'Alkim Kağıt',                sector:'Kağıt / Ambalaj',             price:0, target:4,  size:'sm', color:'#6b3fcc', lots:[]},
-  {ticker:'ALTNY', name:'Altınay Savunma',            sector:'Savunma Teknolojileri',       price:0, target:4,  size:'sm', color:'#e06020', lots:[]},
+  {ticker:'EGEEN.IS', name:'Ege Endüstri',              sector:'Otomotiv Yan San. / İhracat', price:0, target:12, size:'xl', color:'#0a9e7a', lots:[]},
+  {ticker:'FROTO.IS', name:'Ford Otosan',                sector:'Otomotiv / İhracat',          price:0, target:12, size:'xl', color:'#2055cc', lots:[]},
+  {ticker:'OTKAR.IS', name:'Otokar',                     sector:'Savunma Sanayi',              price:0, target:10, size:'lg', color:'#c08000', lots:[]},
+  {ticker:'PGSUS.IS', name:'Pegasus Hava Taşımacılığı',  sector:'Havacılık / Turizm',          price:0, target:7,  size:'lg', color:'#6b3fcc', lots:[]},
+  {ticker:'BRSAN.IS', name:'Borusan Boru Sanayi',        sector:'Çelik / Enerji Altyapısı',   price:0, target:9,  size:'lg', color:'#e06020', lots:[]},
+  {ticker:'CLEBI.IS', name:'Çelebi Hava Servisi',        sector:'Havacılık Hizmetleri',        price:0, target:9,  size:'md', color:'#1a8fa0', lots:[]},
+  {ticker:'ISMEN.IS', name:'İş Yatırım Menkul Değ.',     sector:'Finans',                      price:0, target:7,  size:'md', color:'#0a9e7a', lots:[]},
+  {ticker:'ANSGR.IS', name:'Anadolu Sigorta',            sector:'Sigorta',                     price:0, target:7,  size:'md', color:'#2055cc', lots:[]},
+  {ticker:'LOGO.IS',  name:'Logo Yazılım',               sector:'Yazılım / Teknoloji',          price:0, target:7,  size:'md', color:'#d94040', lots:[]},
+  {ticker:'SODSN.IS', name:'Sodaş Sodyum Sanayi',        sector:'Kimya',                       price:0, target:6,  size:'md', color:'#c08000', lots:[]},
+  {ticker:'LKMNH.IS', name:'Lokman Hekim',               sector:'Sağlık',                      price:0, target:6,  size:'md', color:'#5a8040', lots:[]},
+  {ticker:'ALKA.IS',  name:'Alkim Kağıt',                sector:'Kağıt / Ambalaj',             price:0, target:4,  size:'sm', color:'#6b3fcc', lots:[]},
+  {ticker:'ALTNY.IS', name:'Altınay Savunma',            sector:'Savunma Teknolojileri',       price:0, target:4,  size:'sm', color:'#e06020', lots:[]},
 ];
 
 // ══════════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════════
 let portfolio  = JSON.parse(localStorage.getItem('avP') || 'null') || DEFAULTS.map(s => ({...s}));
-portfolio.forEach(s => { if (s.ticker === 'LOKMAN') s.ticker = 'LKMNH'; });
+portfolio.forEach(s => {
+  if (s.ticker === 'LOKMAN') s.ticker = 'LKMNH.IS';
+  if (!s.ticker.includes('.') && !s.ticker.includes('-') && !s.ticker.includes('=')) {
+    s.ticker = s.ticker + '.IS';
+  }
+});
 let usdTry     = parseFloat(localStorage.getItem('avFx') || '38.50');
 let editIdx    = -1, panelIdx = -1;
 let autoTimer  = null;
@@ -582,7 +593,7 @@ async function fetchViaProxy(symbol, proxy) {
 
 async function fetchLivePrices() {
   setLiveStatus('loading');
-  const allSymbols = [...portfolio.map(s => s.ticker + '.IS'), 'USDTRY=X'];
+  const allSymbols = [...portfolio.map(s => s.ticker), 'USDTRY=X'];
   let successCount = 0;
 
   const applyResults = (results) => {
@@ -593,7 +604,7 @@ async function fetchLivePrices() {
       if (sym === 'USDTRY=X') {
         if (q.price > 1) { usdTry = q.price; localStorage.setItem('avFx', usdTry); }
       } else {
-        const stock = portfolio.find(s => s.ticker === sym.replace('.IS',''));
+        const stock = portfolio.find(s => s.ticker === sym);
         if (stock && q.price > 0) {
           stock.price = q.price; stock.dayChange = q.change; stock.dayChangePct = q.changePct;
           successCount++;
@@ -612,10 +623,20 @@ async function fetchLivePrices() {
     yahooCrumb = null;
   }
 
-  // ── 2. YEDEK: Proxy rotasyonu ──
+  // ── 2. YEDEK: Proxy rotasyonu (Sıralı istek ve rate-limit koruması ile) ──
   if (successCount === 0) {
     for (const proxy of PROXIES) {
-      const results = await Promise.allSettled(allSymbols.map(sym => fetchViaProxy(sym, proxy)));
+      const results = [];
+      for (const sym of allSymbols) {
+        try {
+          const res = await fetchViaProxy(sym, proxy);
+          results.push({status: 'fulfilled', value: res});
+        } catch(e) {
+          results.push({status: 'rejected', reason: e});
+        }
+        // Proxy rate limit engeline takılmamak için her istek arasında 120ms bekle
+        await new Promise(r => setTimeout(r, 120));
+      }
       applyResults(results);
       if (successCount > 0) break;
     }
@@ -768,7 +789,7 @@ function renderGrid() {
       <div>
         <div class="stk-head">
           <div>
-            <div class="stk-ticker" style="color:${col}">${s.ticker}</div>
+            <div class="stk-ticker" style="color:${col}">${s.ticker.replace('.IS', '')}</div>
             <div class="stk-name">${s.name}</div>
             <div class="stk-sector">${s.sector}</div>
           </div>
@@ -815,10 +836,10 @@ function renderAlloc() {
   portfolio.forEach((s, i) => {
     const pct = (s.target || 0) / tt * 100, col = s.color || COLORS[i % COLORS.length];
     const seg = document.createElement('div');
-    seg.className = 'alloc-seg'; seg.style.cssText = `width:${pct}%;background:${col}`; seg.title = `${s.ticker} ${s.target}%`;
+    seg.className = 'alloc-seg'; seg.style.cssText = `width:${pct}%;background:${col}`; seg.title = `${s.ticker.replace('.IS', '')} ${s.target}%`;
     bar.appendChild(seg);
     const item = document.createElement('div'); item.className = 'al';
-    item.innerHTML = `<div class="al-dot" style="background:${col}"></div><span class="al-txt">${s.ticker} ${s.target}%</span>`;
+    item.innerHTML = `<div class="al-dot" style="background:${col}"></div><span class="al-txt">${s.ticker.replace('.IS', '')} ${s.target}%</span>`;
     item.onclick = () => openPanel(i); leg.appendChild(item);
   });
 }
@@ -841,7 +862,7 @@ function calcBudget() {
     const col = s.color || COLORS[i % COLORS.length];
     const lotHint = s.price > 0 ? `≈ ${Math.floor(amount / s.price)} lot` : null;
     html += `<div class="alloc-item">
-      <div class="alloc-ticker" style="color:${col}">${s.ticker}</div>
+      <div class="alloc-ticker" style="color:${col}">${s.ticker.replace('.IS', '')}</div>
       <div class="alloc-amount">${fTL(amount)}</div>
       <div class="alloc-pct">${(pct*100).toFixed(1)}% · ${s.name.split(' ')[0]}</div>
       ${lotHint ? `<div class="alloc-lot-hint">${lotHint}</div>` : ''}
@@ -859,7 +880,7 @@ function closePanel() { document.getElementById('panel').classList.remove('open'
 function refreshPanel() {
   if (panelIdx < 0) return;
   const s = portfolio[panelIdx]; const c = calc(s); const col = s.color || 'var(--teal)';
-  document.getElementById('pTick').textContent = s.ticker;
+  document.getElementById('pTick').textContent = s.ticker.replace('.IS', '');
   document.getElementById('pTick').style.color = col;
   document.getElementById('pName').textContent = s.name;
   document.getElementById('pSect').textContent = s.sector;
@@ -938,7 +959,7 @@ function delLot(li) {
 // LOT MODAL
 // ══════════════════════════════════════════════════════════════
 function openLotModal() {
-  document.getElementById('lotMTitle').textContent = 'Alım Ekle — ' + portfolio[panelIdx].ticker;
+  document.getElementById('lotMTitle').textContent = 'Alım Ekle — ' + portfolio[panelIdx].ticker.replace('.IS', '');
   document.getElementById('lQty').value   = '';
   document.getElementById('lPrice').value = '';
   document.getElementById('lFx').value   = usdTry || '';
@@ -964,6 +985,7 @@ function openAdd() {
   editIdx = -1;
   document.getElementById('mTitle').textContent = 'Hisse Ekle';
   ['fTicker','fName','fSector','fTarget','fLotQty','fLotPrice'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fBist').checked = true;
   document.getElementById('fSize').value  = 'md';
   document.getElementById('fColor').value = '#0a9e7a';
   document.getElementById('fLotFx').value = usdTry || '';
@@ -973,8 +995,9 @@ function openAdd() {
 function openEdit() {
   if (panelIdx < 0) return;
   const s = portfolio[panelIdx]; editIdx = panelIdx;
-  document.getElementById('mTitle').textContent = 'Düzenle: ' + s.ticker;
-  document.getElementById('fTicker').value = s.ticker;
+  document.getElementById('mTitle').textContent = 'Düzenle: ' + s.ticker.replace('.IS', '');
+  document.getElementById('fTicker').value = s.ticker.replace('.IS', '');
+  document.getElementById('fBist').checked = s.ticker.endsWith('.IS');
   document.getElementById('fName').value   = s.name;
   document.getElementById('fSector').value = s.sector || '';
   document.getElementById('fTarget').value = s.target || '';
@@ -988,8 +1011,12 @@ function openEdit() {
 }
 function closeModal() { document.getElementById('overlay').classList.remove('open'); }
 function saveStock() {
-  const ticker = document.getElementById('fTicker').value.trim().toUpperCase();
+  let ticker = document.getElementById('fTicker').value.trim().toUpperCase();
   if (!ticker) { alert('Ticker zorunludur.'); return; }
+  const isBist = document.getElementById('fBist').checked;
+  if (isBist && !ticker.endsWith('.IS') && !ticker.includes('.')) {
+    ticker += '.IS';
+  }
   const name   = document.getElementById('fName').value.trim();
   const sector = document.getElementById('fSector').value.trim();
   const target = parseFloat(document.getElementById('fTarget').value) || 0;
@@ -1016,7 +1043,7 @@ function saveStock() {
 
 function delStock() {
   if (panelIdx < 0) return;
-  if (!confirm(portfolio[panelIdx].ticker + ' silinsin mi?')) return;
+  if (!confirm(portfolio[panelIdx].ticker.replace('.IS', '') + ' silinsin mi?')) return;
   portfolio.splice(panelIdx, 1);
   persist(); closePanel(); render();
 }
@@ -1140,7 +1167,7 @@ function renderBarChart() {
     ctx.fillStyle = col;
     ctx.font = 'bold 9px DM Mono';
     ctx.textAlign = 'center';
-    ctx.fillText(s.ticker, cx, H - padB + 16);
+    ctx.fillText(s.ticker.replace('.IS', ''), cx, H - padB + 16);
 
     // Değer etiketi
     ctx.fillStyle = '#1a2035'; ctx.font = '8px DM Mono';
