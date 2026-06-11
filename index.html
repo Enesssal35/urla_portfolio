@@ -389,6 +389,7 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
         <tr>
           <th>Hisse</th>
           <th>Hisse Adı</th>
+          <th style="color:var(--teal)">Sonraki Temettü Tarihi</th>
           <th>Toplam Lot</th>
           <th>Top. Brüt (TL)</th>
           <th>Top. Net (TL)</th>
@@ -398,7 +399,7 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
         </tr>
       </thead>
       <tbody id="divTableBody">
-        <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>
+        <tr><td colspan="9" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>
       </tbody>
     </table>
   </div>
@@ -1945,10 +1946,18 @@ function renderDividends() {
     upUSD += dSum.upUSD;
     
     const col = s.color || COLORS[i % COLORS.length];
+    // Sonraki / en yakın temettü tarihini bul
+    const futureDivs = (s.dividends || []).filter(d => d.date > '2026-06-03').sort((a,b) => a.date.localeCompare(b.date));
+    const nextDiv = futureDivs.length > 0 ? futureDivs[0] : null;
+    const nextDivDateHtml = nextDiv
+      ? `<span style="background:var(--teal-l);color:var(--teal);font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap">${fDate(nextDiv.date)}</span>`
+      : '<span style="color:var(--muted2)">—</span>';
+
     const row = document.createElement('tr');
     row.innerHTML = `
       <td style="font-weight:bold;color:${col};cursor:pointer" onclick="openPanel(${i})">${s.ticker.replace('.IS', '')}</td>
       <td style="font-size:11px;color:var(--ink2)">${s.name || '—'}</td>
+      <td style="text-align:center">${nextDivDateHtml}</td>
       <td>${fmt(c.totalQty)}</td>
       <td>${dSum.totalGross > 0 ? fTL(dSum.totalGross) : '—'}</td>
       <td style="font-weight:600;color:var(--teal)">${dSum.totalNet > 0 ? fTL(dSum.totalNet) : '—'}</td>
@@ -1986,6 +1995,7 @@ function renderDividends() {
       <td>TOPLAM</td>
       <td>—</td>
       <td>—</td>
+      <td>—</td>
       <td>${totGross > 0 ? fTL(totGross) : '—'}</td>
       <td style="color:var(--teal)">${totNet > 0 ? fTL(totNet) : '—'}</td>
       <td style="color:var(--blue)">${totUSD > 0 ? fUSD(totUSD) : '—'}</td>
@@ -1994,7 +2004,7 @@ function renderDividends() {
     `;
     if (tbody) tbody.appendChild(row);
   } else {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:14px;">Temettü verisi yok.</td></tr>';
   }
   
   const totalYoCPort = totCost > 0 ? (totNet / totCost) * 100 : 0;
