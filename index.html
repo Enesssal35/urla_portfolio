@@ -620,7 +620,7 @@ async function fetchLivePrices() {
     const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(allSymbols.join(','))}`;
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
     const ctrl = new AbortController();
-    const tid  = setTimeout(() => ctrl.abort(), 6000);
+    const tid  = setTimeout(() => ctrl.abort(), 15000);
     const res = await fetch(proxyUrl, { signal: ctrl.signal, cache: 'no-cache' });
     clearTimeout(tid);
     if (res.ok) {
