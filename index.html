@@ -471,6 +471,13 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
 </div>
 
 <script>
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+  const errDiv = document.createElement('div');
+  errDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(217,64,64,0.95);color:white;font-size:11px;font-family:monospace;padding:10px;z-index:9999;word-break:break-all';
+  errDiv.innerHTML = '<b>Hata:</b> ' + msg + '<br><b>Satır:</b> ' + lineNo + ':' + columnNo;
+  document.body.appendChild(errDiv);
+  return false;
+};
 // ══════════════════════════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════════════════════════
@@ -1153,14 +1160,22 @@ function renderBarChart() {
     const tY = yTL(c.valTL);
     ctx.fillStyle = '#2055cc';
     ctx.beginPath();
-    ctx.roundRect(cx - barW - 2, tY, barW, H - padB - tY, [3, 3, 0, 0]);
+    if (ctx.roundRect) {
+      ctx.roundRect(cx - barW - 2, tY, barW, H - padB - tY, [3, 3, 0, 0]);
+    } else {
+      ctx.rect(cx - barW - 2, tY, barW, H - padB - tY);
+    }
     ctx.fill();
 
     // USD bar (yeşil)
     const uY = yUSD(c.valUSD);
     ctx.fillStyle = '#0a9e7a';
     ctx.beginPath();
-    ctx.roundRect(cx + 2, uY, barW, H - padB - uY, [3, 3, 0, 0]);
+    if (ctx.roundRect) {
+      ctx.roundRect(cx + 2, uY, barW, H - padB - uY, [3, 3, 0, 0]);
+    } else {
+      ctx.rect(cx + 2, uY, barW, H - padB - uY);
+    }
     ctx.fill();
 
     // Ticker etiketi
