@@ -236,7 +236,7 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
     </div>
 
     <!-- USD/TRY -->
-    <div id="fxPill" onclick="openFxModal()" title="Kuru güncelle">
+    <div id="fxPill" onclick="openFxModal()" title="Bağlantı & Kur Ayarları">
       <span style="font-family:var(--mono);font-size:9px;color:var(--muted)">USD/TRY</span>
       <span style="font-family:var(--mono);font-size:12px;font-weight:500;color:var(--gold)" id="hFx">—</span>
     </div>
@@ -438,12 +438,30 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
 
 <!-- ── FX MODAL ── -->
 <div class="overlay" id="fxOverlay">
-  <div class="modal" style="max-width:420px">
+  <div class="modal" style="max-width:440px">
     <div class="modal-drag"></div>
-    <div class="modal-title">Manuel USD / TRY Kuru</div>
-    <div class="fg"><label class="flbl">USD/TRY</label><input type="number" id="fxUsd" placeholder="38.50" step="0.01"></div>
-    <p class="hint">Canlı veri çekildiğinde bu değer otomatik güncellenir. Manuel giriş yaparsanız bir sonraki canlı güncellemeye kadar geçerli olur.</p>
-    <div class="mbtns">
+    <div class="modal-title">Bağlantı & Kur Ayarları</div>
+    
+    <div class="fg" style="margin-bottom:14px">
+      <label class="flbl">Manuel USD / TRY Kuru</label>
+      <input type="number" id="fxUsd" placeholder="38.50" step="0.01">
+      <p class="hint" style="margin-top:3px">Canlı veri çekildiğinde bu değer otomatik güncellenir.</p>
+    </div>
+    
+    <hr class="dv" style="margin:14px 0">
+    
+    <div class="fg">
+      <label class="flbl" style="display:flex;align-items:center;gap:4px">
+        <span>Özel CORS Proxy URL (Cloudflare Worker)</span>
+        <span style="font-size:9px;background:var(--teal-l);color:var(--teal);padding:1px 4px;border-radius:3px;font-weight:normal">Önerilen</span>
+      </label>
+      <input type="url" id="fxProxy" placeholder="https://urla-portfolio-proxy.username.workers.dev/">
+      <p class="hint" style="margin-top:4px;line-height:1.4">
+        Türkiye'de engelsiz, 0 saniye gecikmeli canlı veri için kendinize ait ücretsiz bir Cloudflare Worker kurup URL'sini buraya yapıştırın. Boş bırakırsanız GitHub sunucusundaki veri kullanılır.
+      </p>
+    </div>
+    
+    <div class="mbtns" style="margin-top:18px">
       <button class="mb mb-s" onclick="closeFxModal()">İptal</button>
       <button class="mb mb-p" onclick="saveFx()">Güncelle</button>
     </div>
@@ -522,6 +540,7 @@ portfolio.forEach(s => {
   }
 });
 let usdTry     = parseFloat(localStorage.getItem('avFx') || '38.50');
+let customProxy = localStorage.getItem('avProxy') || '';
 let editIdx    = -1, panelIdx = -1;
 let autoTimer  = null;
 let lastUpdate = null;
@@ -615,40 +634,60 @@ async function fetchLivePrices() {
   const allSymbols = [...portfolio.map(s => s.ticker), 'USDTRY=X'];
   let successCount = 0;
 
-  // ── 0. BULK PROXY (AllOrigins — Tıklandığında veya ilk açılışta canlı deneme) ──
-  try {
-    const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(allSymbols.join(','))}`;
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const ctrl = new AbortController();
-    const tid  = setTimeout(() => ctrl.abort(), 15000);
-    const res = await fetch(proxyUrl, { signal: ctrl.signal, cache: 'no-cache' });
-    clearTimeout(tid);
-    if (res.ok) {
-      const data = await res.json();
-      const result = data?.quoteResponse?.result || [];
-      if (result.length > 0) {
-        result.forEach(q => {
-          const sym = q.symbol;
-          if (sym === 'USDTRY=X') {
-            if (q.regularMarketPrice > 1) { usdTry = q.regularMarketPrice; localStorage.setItem('avFx', usdTry); }
-          } else {
-            const stock = portfolio.find(s => s.ticker === sym);
-            if (stock && q.regularMarketPrice > 0) {
-              stock.price = q.regularMarketPrice;
-              stock.dayChange = q.regularMarketChange || 0;
-              stock.dayChangePct = q.regularMarketChangePercent || 0;
-              successCount++;
+  // ── 0. ÖZEL PROXY (Cloudflare Worker — Eğer tanımlıysa ilk önce bunu dene) ──
+  if (customProxy) {
+    try {
+      let proxyBase = customProxy.trim();
+      if (!proxyBase.endsWith('/') && !proxyBase.includes('?')) {
+        proxyBase += '/';
+      }
+      const targetUrl = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(allSymbols.join(','))}&nocache=${Date.now()}`;
+      
+      let finalUrl = '';
+      if (proxyBase.includes('?')) {
+        if (proxyBase.endsWith('url=')) {
+          finalUrl = proxyBase + encodeURIComponent(targetUrl);
+        } else if (proxyBase.includes('url=')) {
+          finalUrl = proxyBase.replace('url=', 'url=' + encodeURIComponent(targetUrl));
+        } else {
+          finalUrl = proxyBase + (proxyBase.endsWith('&') ? '' : '&') + 'url=' + encodeURIComponent(targetUrl);
+        }
+      } else {
+        finalUrl = proxyBase + targetUrl;
+      }
+
+      console.log('Özel proxy deneniyor:', finalUrl);
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), 8000); // 8s timeout for custom proxy
+      const res = await fetch(finalUrl, { signal: ctrl.signal, cache: 'no-cache' });
+      clearTimeout(tid);
+      if (res.ok) {
+        const data = await res.json();
+        const result = data?.quoteResponse?.result || [];
+        if (result.length > 0) {
+          result.forEach(q => {
+            const sym = q.symbol;
+            if (sym === 'USDTRY=X') {
+              if (q.regularMarketPrice > 1) { usdTry = q.regularMarketPrice; localStorage.setItem('avFx', usdTry); }
+            } else {
+              const stock = portfolio.find(s => s.ticker === sym);
+              if (stock && q.regularMarketPrice > 0) {
+                stock.price = q.regularMarketPrice;
+                stock.dayChange = q.regularMarketChange || 0;
+                stock.dayChangePct = q.regularMarketChangePercent || 0;
+                successCount++;
+              }
             }
+          });
+          if (successCount > 0) {
+            lastUpdate = new Date();
+            console.log('Özel proxy başarılı:', successCount, 'hisse yüklendi');
           }
-        });
-        if (successCount > 0) {
-          lastUpdate = new Date();
-          console.log('Bulk proxy başarılı:', successCount, 'hisse yüklendi');
         }
       }
+    } catch(e) {
+      console.warn('Özel proxy başarısız:', e.message);
     }
-  } catch(e) {
-    console.warn('Bulk proxy başarısız, prices.json denenecek:', e.message);
   }
 
   const applyFromJson = (data) => {
@@ -686,7 +725,45 @@ async function fetchLivePrices() {
     });
   };
 
-  // ── 1. ANA: prices.json (GitHub Actions — her cihazda çalışır!) ──
+  // ── 1. BULK PROXY (AllOrigins — Sadece özel proxy yoksa dene) ──
+  if (successCount === 0 && !customProxy) {
+    try {
+      const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(allSymbols.join(','))}&nocache=${Date.now()}`;
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), 4000); // 4s timeout (so it falls back fast if blocked)
+      const res = await fetch(proxyUrl, { signal: ctrl.signal, cache: 'no-cache' });
+      clearTimeout(tid);
+      if (res.ok) {
+        const data = await res.json();
+        const result = data?.quoteResponse?.result || [];
+        if (result.length > 0) {
+          result.forEach(q => {
+            const sym = q.symbol;
+            if (sym === 'USDTRY=X') {
+              if (q.regularMarketPrice > 1) { usdTry = q.regularMarketPrice; localStorage.setItem('avFx', usdTry); }
+            } else {
+              const stock = portfolio.find(s => s.ticker === sym);
+              if (stock && q.regularMarketPrice > 0) {
+                stock.price = q.regularMarketPrice;
+                stock.dayChange = q.regularMarketChange || 0;
+                stock.dayChangePct = q.regularMarketChangePercent || 0;
+                successCount++;
+              }
+            }
+          });
+          if (successCount > 0) {
+            lastUpdate = new Date();
+            console.log('Bulk proxy başarılı:', successCount, 'hisse yüklendi');
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('Bulk proxy başarısız:', e.message);
+    }
+  }
+
+  // ── 2. ANA YEDEK: prices.json (GitHub Actions — özel proxy başarısızsa veya yoksa her cihazda çalışır!) ──
   if (successCount === 0) {
     try {
       const data = await fetchFromPricesJson();
@@ -697,8 +774,8 @@ async function fetchLivePrices() {
     }
   }
 
-  // ── 2. YEDEK: Direkt Yahoo Finance (localhost/crumb — sadece desktop) ──
-  if (successCount === 0) {
+  // ── 3. YEDEK: Direkt Yahoo Finance (localhost/crumb — sadece desktop ve CORS bypass açıkken) ──
+  if (successCount === 0 && !customProxy) {
     try {
       if (!yahooCrumb) yahooCrumb = await getYahooCrumb();
       const results = await Promise.allSettled(allSymbols.map(sym => fetchYFDirect(sym)));
@@ -709,8 +786,8 @@ async function fetchLivePrices() {
     }
   }
 
-  // ── 3. SON YEDEK: Proxy ──
-  if (successCount === 0) {
+  // ── 4. SON YEDEK: Proxy Listesi (Sadece özel proxy yoksa) ──
+  if (successCount === 0 && !customProxy) {
     for (const proxy of PROXIES) {
       const results = [];
       for (const sym of allSymbols) {
@@ -790,6 +867,7 @@ function today() {
 function persist() {
   localStorage.setItem('avP', JSON.stringify(portfolio));
   localStorage.setItem('avFx', usdTry);
+  localStorage.setItem('avProxy', customProxy);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1138,12 +1216,20 @@ function delStock() {
 // ══════════════════════════════════════════════════════════════
 // FX MODAL
 // ══════════════════════════════════════════════════════════════
-function openFxModal()  { document.getElementById('fxUsd').value = usdTry || ''; document.getElementById('fxOverlay').classList.add('open'); }
+function openFxModal()  { 
+  document.getElementById('fxUsd').value = usdTry || ''; 
+  document.getElementById('fxProxy').value = customProxy || '';
+  document.getElementById('fxOverlay').classList.add('open'); 
+}
 function closeFxModal() { document.getElementById('fxOverlay').classList.remove('open'); }
 function saveFx() {
   const v = parseFloat(document.getElementById('fxUsd').value);
-  if (!isNaN(v) && v > 0) { usdTry = v; persist(); render(); }
+  if (!isNaN(v) && v > 0) { usdTry = v; }
+  customProxy = document.getElementById('fxProxy').value.trim();
+  persist(); 
+  render(); 
   closeFxModal();
+  fetchLivePrices();
 }
 
 // ══════════════════════════════════════════════════════════════
