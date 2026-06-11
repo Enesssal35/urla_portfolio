@@ -537,6 +537,16 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
     
     <hr class="dv" style="margin:14px 0">
     
+    <div class="fg" style="margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="fxIgnoreDivDates" style="width:16px; height:16px; cursor:pointer;">
+      <label for="fxIgnoreDivDates" class="flbl" style="margin-bottom:0; cursor:pointer; font-weight:600;">Temettü Tarih Duyarlılığını Kapat</label>
+    </div>
+    <p class="hint" style="margin-top:-8px; line-height:1.4; margin-bottom:14px">
+      Eğer alım tarihlerinizi geçmişe dönük girmeyip hepsini varsayılan olarak bıraktıysanız, bu seçeneği açarak tüm lotlarınız için geçmiş temettüleri hesaplatabilirsiniz.
+    </p>
+    
+    <hr class="dv" style="margin:14px 0">
+    
     <div class="fg">
       <label class="flbl" style="display:flex;align-items:center;gap:4px">
         <span>Özel CORS Proxy URL (Cloudflare Worker)</span>
@@ -695,6 +705,7 @@ portfolio.forEach(s => {
 });
 let usdTry     = parseFloat(localStorage.getItem('avFx') || '38.50');
 let customProxy = localStorage.getItem('avProxy') || 'https://urla-portfolio-proxy.enesla6352.workers.dev/';
+let ignoreDivDates = localStorage.getItem('avIgnoreDivDates') === 'true';
 let editIdx    = -1, panelIdx = -1;
 let autoTimer  = null;
 let lastUpdate = null;
@@ -1037,6 +1048,7 @@ function persist() {
   localStorage.setItem('avP', JSON.stringify(portfolio));
   localStorage.setItem('avFx', usdTry);
   localStorage.setItem('avProxy', customProxy);
+  localStorage.setItem('avIgnoreDivDates', ignoreDivDates);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1550,7 +1562,7 @@ async function scanDividends() {
         let lotsCount = 0;
         if (s.lots) {
           s.lots.forEach(l => {
-            if (!l.date || l.date <= divDateStr) {
+            if (ignoreDivDates || !l.date || l.date <= divDateStr) {
               lotsCount += (l.qty || 0);
             }
           });
@@ -1746,7 +1758,7 @@ async function autoScanDividendsSilent() {
         let lotsCount = 0;
         if (s.lots) {
           s.lots.forEach(l => {
-            if (!l.date || l.date <= divDateStr) {
+            if (ignoreDivDates || !l.date || l.date <= divDateStr) {
               lotsCount += (l.qty || 0);
             }
           });
@@ -2054,6 +2066,7 @@ function delStock() {
 function openFxModal()  { 
   document.getElementById('fxUsd').value = usdTry || ''; 
   document.getElementById('fxProxy').value = customProxy || '';
+  document.getElementById('fxIgnoreDivDates').checked = ignoreDivDates;
   document.getElementById('fxOverlay').classList.add('open'); 
 }
 function closeFxModal() { document.getElementById('fxOverlay').classList.remove('open'); }
@@ -2061,6 +2074,7 @@ function saveFx() {
   const v = parseFloat(document.getElementById('fxUsd').value);
   if (!isNaN(v) && v > 0) { usdTry = v; }
   customProxy = document.getElementById('fxProxy').value.trim();
+  ignoreDivDates = document.getElementById('fxIgnoreDivDates').checked;
   persist(); 
   render(); 
   closeFxModal();
@@ -2210,10 +2224,10 @@ render();
 startAutoRefresh();
 window.addEventListener('resize', () => { renderGrid(); renderBarChart(); });
 
-// Sayfa açıldıktan 3 saniye sonra arka planda canlı temettü taraması yap
+// Sayfa açıldıktan 1.5 saniye sonra arka planda canlı temettü taraması yap
 setTimeout(() => {
   autoScanDividendsSilent();
-}, 3000);
+}, 1500);
 </script>
 </body>
 </html>
