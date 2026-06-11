@@ -1527,12 +1527,24 @@ async function scanDividends() {
     const results = await Promise.all(fetchPromises);
     detectedDividendsTemp = [];
     
+    console.log('--- TEMETTÜ TARAMA TEŞHİS RAPORU ---');
     results.forEach(res => {
-      if (res.error) return;
+      if (res.error) {
+        console.error(`Hisse ${portfolio[res.index].ticker} için tarama hatası:`, res.error);
+        return;
+      }
       const s = portfolio[res.index];
       const divs = res.dividends;
+      const divList = Object.values(divs);
       
-      Object.values(divs).forEach(div => {
+      console.log(`Hisse: ${s.ticker}, Kayıtlı Alım Sayısı: ${s.lots ? s.lots.length : 0}, API'den Dönen Temettü Sayısı: ${divList.length}`);
+      if (s.lots && s.lots.length > 0) {
+        console.log(`  Mevcut Alımlarınız:`, JSON.stringify(s.lots));
+      } else {
+        console.log(`  (Alım kaydınız bulunmuyor!)`);
+      }
+      
+      divList.forEach(div => {
         const divDateStr = new Date(div.date * 1000).toISOString().split('T')[0];
         
         let lotsCount = 0;
@@ -1543,6 +1555,8 @@ async function scanDividends() {
             }
           });
         }
+        
+        console.log(`  - Temettü Tarihi: ${divDateStr}, Pay Başı Brüt: ${div.amount} TL, O Tarihteki Lotunuz: ${lotsCount}`);
         
         if (lotsCount > 0) {
           const exists = (s.dividends || []).some(d => d.date === divDateStr);
@@ -1571,6 +1585,7 @@ async function scanDividends() {
         }
       });
     });
+    console.log('--- TEŞHİS RAPORU BİTTİ ---');
     
     if (detectedDividendsTemp.length === 0) {
       alert('Yeni temettü ödemesi bulunamadı. Tüm temettüleriniz güncel!');
