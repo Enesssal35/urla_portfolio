@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+<script>
+  if (localStorage.getItem('avTheme') === 'dark') {
+    document.documentElement.classList.add('dark-mode');
+  }
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Avatar Yatırım Terminali</title>
@@ -17,6 +22,18 @@
   --purple:#6b3fcc; --purple-l:#f2eeff;
   --mono:'DM Mono',monospace; --sans:'Plus Jakarta Sans',sans-serif;
   --r:12px;
+  --header-bg: rgba(240, 242, 247, 0.96);
+}
+.dark-mode {
+  --bg:#0c0e17; --bg2:#161925; --surface:#121520; --surface2:#1a1d2b;
+  --border:#22263b; --border2:#2d3250;
+  --ink:#f0f2fa; --ink2:#b9c0d4; --muted:#7a88a8; --muted2:#5c6785;
+  --teal:#0ecb9c; --teal-l:#102a24;
+  --red:#f87171; --red-l:#3c1e20;
+  --gold:#f59e0b; --gold-l:#352613;
+  --blue:#3b82f6; --blue-l:#162445;
+  --purple:#a78bfa; --purple-l:#281e42;
+  --header-bg: rgba(12, 14, 23, 0.96);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html{font-size:14px;}
@@ -25,14 +42,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:10
 /* ── HEADER ── */
 header{
   position:sticky;top:0;z-index:200;
-  background:rgba(240,242,247,.96);
+  background:var(--header-bg);
   backdrop-filter:blur(16px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;
   gap:12px;padding:0 20px;height:56px;
 }
 .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;color:var(--ink);letter-spacing:-.3px;white-space:nowrap;}
-.logo-mark{width:28px;height:28px;background:var(--ink);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#fff;flex-shrink:0;}
+.logo-mark{width:28px;height:28px;background:var(--blue);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#fff;flex-shrink:0;}
 .header-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .abtn{height:34px;padding:0 12px;border-radius:9px;border:none;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:4px;white-space:nowrap;}
 .abtn-p{background:var(--ink);color:#fff;}
@@ -252,6 +269,7 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
 
     <button class="abtn abtn-g" onclick="exportData()" title="Verileri dışa aktar">💾 Dışa Aktar</button>
     <label class="abtn abtn-g" style="cursor:pointer" title="Verileri içe aktar">📂 İçe Aktar<input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)"></label>
+    <button class="abtn abtn-g" id="themeToggle" onclick="toggleTheme()" title="Koyu/Açık Mod" style="width:34px;padding:0;justify-content:center;">🌙</button>
     <button class="abtn abtn-p" onclick="openAdd()">+ Ekle</button>
   </div>
 </header>
@@ -680,6 +698,21 @@ let editIdx    = -1, panelIdx = -1;
 let autoTimer  = null;
 let lastUpdate = null;
 let proxyIdx   = 0;
+
+// Tema Yönetimi
+function toggleTheme() {
+  const isDark = document.documentElement.classList.toggle('dark-mode');
+  localStorage.setItem('avTheme', isDark ? 'dark' : 'light');
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+  renderBarChart();
+}
+// Sayfa açılışında buton simgesini güncelle
+setTimeout(() => {
+  const isDark = document.documentElement.classList.contains('dark-mode');
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+}, 50);
 
 // ══════════════════════════════════════════════════════════════
 // CANLI VERİ — Yahoo Finance
@@ -1861,9 +1894,15 @@ function renderBarChart() {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
 
+  // Tema renklerini al
+  const bodyStyle = getComputedStyle(document.body);
+  const borderCol = bodyStyle.getPropertyValue('--border').trim() || '#dde1ee';
+  const mutedCol = bodyStyle.getPropertyValue('--muted').trim() || '#7a88a8';
+  const inkCol = bodyStyle.getPropertyValue('--ink').trim() || '#1a2035';
+
   const active = portfolio.filter(s => calc(s).valTL > 0);
   if (!active.length) {
-    ctx.fillStyle = '#7a88a8';
+    ctx.fillStyle = mutedCol;
     ctx.font = '13px Plus Jakarta Sans';
     ctx.textAlign = 'center';
     ctx.fillText('Fiyat ve lot girildikten sonra grafik oluşur.', W/2, H/2);
@@ -1884,14 +1923,14 @@ function renderBarChart() {
   function yUSD(v) { return padT + plotH - (v / (maxUSD || 1)) * plotH; }
 
   // Grid çizgileri
-  ctx.strokeStyle = '#dde1ee'; ctx.lineWidth = 1;
+  ctx.strokeStyle = borderCol; ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = padT + (plotH / 4) * i;
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
   }
 
   // Eksen etiketleri
-  ctx.fillStyle = '#7a88a8'; ctx.font = '9px DM Mono'; ctx.textAlign = 'right';
+  ctx.fillStyle = mutedCol; ctx.font = '9px DM Mono'; ctx.textAlign = 'right';
   for (let i = 0; i <= 4; i++) {
     const y = padT + (plotH / 4) * i;
     const vTL  = maxTL  - (maxTL  / 4) * i;
@@ -1937,7 +1976,7 @@ function renderBarChart() {
     ctx.fillText(s.ticker.replace('.IS', ''), cx, H - padB + 16);
 
     // Değer etiketi
-    ctx.fillStyle = '#1a2035'; ctx.font = '8px DM Mono';
+    ctx.fillStyle = inkCol; ctx.font = '8px DM Mono';
     if (c.valTL  > 0) ctx.fillText(c.valTL  >= 1000 ? (c.valTL /1000).toFixed(1)+'K' : c.valTL.toFixed(0), cx - barW/2 - 2, tY - 4);
   });
 
