@@ -1861,8 +1861,10 @@ function renderDividends() {
   portfolio.forEach((s, i) => {
     const c = calc(s);
     const dSum = calcDivSummary(s);
+    const hasLots = c.totalQty > 0;
+    const hasDivs = (s.dividends || []).length > 0;
     
-    if ((s.dividends || []).length > 0) {
+    if (hasLots || hasDivs) {
       hasDividendsAny = true;
       totGross += dSum.totalGross;
       totNet += dSum.totalNet;
@@ -1874,29 +1876,31 @@ function renderDividends() {
         <td style="font-weight:bold;color:${col};cursor:pointer" onclick="openPanel(${i})">${s.ticker.replace('.IS', '')}</td>
         <td style="font-size:11px;color:var(--ink2)">${s.name || '—'}</td>
         <td>${fmt(c.totalQty)}</td>
-        <td>${fTL(dSum.totalGross)}</td>
-        <td style="font-weight:600;color:var(--teal)">${fTL(dSum.totalNet)}</td>
-        <td style="color:var(--blue)">${fUSD(dSum.totalUSD)}</td>
+        <td>${dSum.totalGross > 0 ? fTL(dSum.totalGross) : '—'}</td>
+        <td style="font-weight:600;color:var(--teal)">${dSum.totalNet > 0 ? fTL(dSum.totalNet) : '—'}</td>
+        <td style="color:var(--blue)">${dSum.totalUSD > 0 ? fUSD(dSum.totalUSD) : '—'}</td>
         <td>${fTL(c.totalCostTL)}</td>
-        <td style="font-weight:bold;color:var(--teal)">${dSum.yoc !== null ? fmtN(dSum.yoc, 2, 2) + '%' : '—'}</td>
+        <td style="font-weight:bold;color:var(--teal)">${dSum.yoc !== null && dSum.yoc > 0 ? fmtN(dSum.yoc, 2, 2) + '%' : '—'}</td>
       `;
       if (tbody) tbody.appendChild(row);
       
-      s.dividends.forEach((d, di) => {
-        allDivs.push({
-          date: d.date || '—',
-          ticker: s.ticker.replace('.IS', ''),
-          color: col,
-          grossPerShare: d.grossPerShare || 0,
-          qty: d.qty || 0,
-          gross: d.gross || 0,
-          tax: d.tax || 0,
-          net: d.net || 0,
-          netUSD: d.netUSD || 0,
-          stockIndex: i,
-          divIndex: di
+      if (hasDivs) {
+        s.dividends.forEach((d, di) => {
+          allDivs.push({
+            date: d.date || '—',
+            ticker: s.ticker.replace('.IS', ''),
+            color: col,
+            grossPerShare: d.grossPerShare || 0,
+            qty: d.qty || 0,
+            gross: d.gross || 0,
+            tax: d.tax || 0,
+            net: d.net || 0,
+            netUSD: d.netUSD || 0,
+            stockIndex: i,
+            divIndex: di
+          });
         });
-      });
+      }
     }
   });
   
