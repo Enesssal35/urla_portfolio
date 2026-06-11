@@ -705,7 +705,7 @@ portfolio.forEach(s => {
 });
 let usdTry     = parseFloat(localStorage.getItem('avFx') || '38.50');
 let customProxy = localStorage.getItem('avProxy') || 'https://urla-portfolio-proxy.enesla6352.workers.dev/';
-let ignoreDivDates = localStorage.getItem('avIgnoreDivDates') === 'true';
+let ignoreDivDates = localStorage.getItem('avIgnoreDivDates') !== 'false';
 let editIdx    = -1, panelIdx = -1;
 let autoTimer  = null;
 let lastUpdate = null;
@@ -1888,46 +1888,43 @@ function renderDividends() {
   portfolio.forEach((s, i) => {
     const c = calc(s);
     const dSum = calcDivSummary(s);
-    const hasLots = c.totalQty > 0;
     const hasDivs = (s.dividends || []).length > 0;
     
-    if (hasLots || hasDivs) {
-      hasDividendsAny = true;
-      totGross += dSum.totalGross;
-      totNet += dSum.totalNet;
-      totUSD += dSum.totalUSD;
-      
-      const col = s.color || COLORS[i % COLORS.length];
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td style="font-weight:bold;color:${col};cursor:pointer" onclick="openPanel(${i})">${s.ticker.replace('.IS', '')}</td>
-        <td style="font-size:11px;color:var(--ink2)">${s.name || '—'}</td>
-        <td>${fmt(c.totalQty)}</td>
-        <td>${dSum.totalGross > 0 ? fTL(dSum.totalGross) : '—'}</td>
-        <td style="font-weight:600;color:var(--teal)">${dSum.totalNet > 0 ? fTL(dSum.totalNet) : '—'}</td>
-        <td style="color:var(--blue)">${dSum.totalUSD > 0 ? fUSD(dSum.totalUSD) : '—'}</td>
-        <td>${fTL(c.totalCostTL)}</td>
-        <td style="font-weight:bold;color:var(--teal)">${dSum.yoc !== null && dSum.yoc > 0 ? fmtN(dSum.yoc, 2, 2) + '%' : '—'}</td>
-      `;
-      if (tbody) tbody.appendChild(row);
-      
-      if (hasDivs) {
-        s.dividends.forEach((d, di) => {
-          allDivs.push({
-            date: d.date || '—',
-            ticker: s.ticker.replace('.IS', ''),
-            color: col,
-            grossPerShare: d.grossPerShare || 0,
-            qty: d.qty || 0,
-            gross: d.gross || 0,
-            tax: d.tax || 0,
-            net: d.net || 0,
-            netUSD: d.netUSD || 0,
-            stockIndex: i,
-            divIndex: di
-          });
+    hasDividendsAny = true;
+    totGross += dSum.totalGross;
+    totNet += dSum.totalNet;
+    totUSD += dSum.totalUSD;
+    
+    const col = s.color || COLORS[i % COLORS.length];
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td style="font-weight:bold;color:${col};cursor:pointer" onclick="openPanel(${i})">${s.ticker.replace('.IS', '')}</td>
+      <td style="font-size:11px;color:var(--ink2)">${s.name || '—'}</td>
+      <td>${fmt(c.totalQty)}</td>
+      <td>${dSum.totalGross > 0 ? fTL(dSum.totalGross) : '—'}</td>
+      <td style="font-weight:600;color:var(--teal)">${dSum.totalNet > 0 ? fTL(dSum.totalNet) : '—'}</td>
+      <td style="color:var(--blue)">${dSum.totalUSD > 0 ? fUSD(dSum.totalUSD) : '—'}</td>
+      <td>${fTL(c.totalCostTL)}</td>
+      <td style="font-weight:bold;color:var(--teal)">${dSum.yoc !== null && dSum.yoc > 0 ? fmtN(dSum.yoc, 2, 2) + '%' : '—'}</td>
+    `;
+    if (tbody) tbody.appendChild(row);
+    
+    if (hasDivs) {
+      s.dividends.forEach((d, di) => {
+        allDivs.push({
+          date: d.date || '—',
+          ticker: s.ticker.replace('.IS', ''),
+          color: col,
+          grossPerShare: d.grossPerShare || 0,
+          qty: d.qty || 0,
+          gross: d.gross || 0,
+          tax: d.tax || 0,
+          net: d.net || 0,
+          netUSD: d.netUSD || 0,
+          stockIndex: i,
+          divIndex: di
         });
-      }
+      });
     }
   });
   
