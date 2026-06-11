@@ -598,10 +598,41 @@ async function fetchViaProxy(symbol, proxy) {
   } catch(e) { clearTimeout(tid); throw e; }
 }
 
+// prices.json'dan oku (GitHub Actions her 10dk günceller — CORS engeli yok!)
+async function fetchFromPricesJson() {
+  const ctrl = new AbortController();
+  const tid  = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch('prices.json', { signal: ctrl.signal, cache: 'no-cache' });
+    clearTimeout(tid);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch(e) { clearTimeout(tid); throw e; }
+}
+
 async function fetchLivePrices() {
   setLiveStatus('loading');
   const allSymbols = [...portfolio.map(s => s.ticker), 'USDTRY=X'];
   let successCount = 0;
+
+  const applyFromJson = (data) => {
+    const prices = data.prices || {};
+    allSymbols.forEach(sym => {
+      const q = prices[sym];
+      if (!q || !q.price) return;
+      if (sym === 'USDTRY=X') {
+        if (q.price > 1) { usdTry = q.price; localStorage.setItem('avFx', usdTry); }
+      } else {
+        const stock = portfolio.find(s => s.ticker === sym);
+        if (stock && q.price > 0) {
+          stock.price = q.price; stock.dayChange = q.change; stock.dayChangePct = q.changePct;
+          successCount++;
+        }
+      }
+    });
+    // prices.json'daki güncelleme zamanını kullan
+    if (data.updated) lastUpdate = new Date(data.updated);
+  };
 
   const applyResults = (results) => {
     results.forEach((r, i) => {
@@ -620,17 +651,28 @@ async function fetchLivePrices() {
     });
   };
 
-  // ── 1. DOĞRUDAN Yahoo Finance (crumb ile) ──
+  // ── 1. ANA: prices.json (GitHub Actions — her cihazda çalışır!) ──
   try {
-    if (!yahooCrumb) yahooCrumb = await getYahooCrumb();
-    const results = await Promise.allSettled(allSymbols.map(sym => fetchYFDirect(sym)));
-    applyResults(results);
+    const data = await fetchFromPricesJson();
+    applyFromJson(data);
+    console.log('prices.json başarılı:', successCount, 'hisse yüklendi');
   } catch(e) {
-    console.warn('Direkt YF başarısız:', e.message);
-    yahooCrumb = null;
+    console.warn('prices.json okunamadı:', e.message);
   }
 
-  // ── 2. YEDEK: Proxy rotasyonu (Sıralı istek ve rate-limit koruması ile) ──
+  // ── 2. YEDEK: Direkt Yahoo Finance (localhost/crumb — sadece desktop) ──
+  if (successCount === 0) {
+    try {
+      if (!yahooCrumb) yahooCrumb = await getYahooCrumb();
+      const results = await Promise.allSettled(allSymbols.map(sym => fetchYFDirect(sym)));
+      applyResults(results);
+    } catch(e) {
+      console.warn('Direkt YF başarısız:', e.message);
+      yahooCrumb = null;
+    }
+  }
+
+  // ── 3. SON YEDEK: Proxy ──
   if (successCount === 0) {
     for (const proxy of PROXIES) {
       const results = [];
@@ -641,7 +683,6 @@ async function fetchLivePrices() {
         } catch(e) {
           results.push({status: 'rejected', reason: e});
         }
-        // Proxy rate limit engeline takılmamak için her istek arasında 120ms bekle
         await new Promise(r => setTimeout(r, 120));
       }
       applyResults(results);
@@ -650,7 +691,7 @@ async function fetchLivePrices() {
   }
 
   persist();
-  lastUpdate = new Date();
+  if (successCount > 0 && !lastUpdate) lastUpdate = new Date();
   setLiveStatus(successCount > 0 ? 'ok' : 'error', successCount > 0 ? null : 'Bağlanamadı — tıkla');
   render();
 }
@@ -658,8 +699,10 @@ async function fetchLivePrices() {
 function startAutoRefresh() {
   fetchLivePrices();
   if (autoTimer) clearInterval(autoTimer);
-  autoTimer = setInterval(fetchLivePrices, 5 * 60 * 1000);
+  // Her 10 dakikada bir yenile (GitHub Actions ile senkron)
+  autoTimer = setInterval(fetchLivePrices, 10 * 60 * 1000);
 }
+
 
 // ══════════════════════════════════════════════════════════════
 // HESAPLAMA
