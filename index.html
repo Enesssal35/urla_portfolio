@@ -1929,12 +1929,29 @@ function renderDividends() {
     upUSD += dSum.upUSD;
     
     const col = s.color || COLORS[i % COLORS.length];
-    // Sonraki / en yakın temettü tarihini bul
-    const futureDivs = (s.dividends || []).filter(d => d.date > '2026-06-03').sort((a,b) => a.date.localeCompare(b.date));
-    const nextDiv = futureDivs.length > 0 ? futureDivs[0] : null;
-    const nextDivDateHtml = nextDiv
-      ? `<span style="background:var(--teal-l);color:var(--teal);font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap">${fDate(nextDiv.date)}</span>`
-      : '<span style="color:var(--muted2)">—</span>';
+    // Sonraki temettüyü bul — BUGUNDEN itibaren (dinamik)
+    const todayStr2 = new Date().toISOString().split('T')[0];
+    const allSortedDivs = (s.dividends || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+    const nextFutureDivObj = allSortedDivs.find(d => d.date >= todayStr2);
+    const lastPastDivObj   = allSortedDivs.filter(d => d.date < todayStr2).slice(-1)[0];
+
+    let nextDivDateHtml;
+    if (nextFutureDivObj) {
+      // Gelecekte ilan edilmis temettü var
+      const daysLeft = Math.ceil((new Date(nextFutureDivObj.date) - new Date()) / 86400000);
+      nextDivDateHtml =
+        '<span style="background:var(--teal-l);color:var(--teal);font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;white-space:nowrap">' +
+        fDate(nextFutureDivObj.date) + '</span>' +
+        '<span style="font-size:9px;color:var(--muted2);margin-left:4px">' + daysLeft + ' gün</span>';
+    } else if (lastPastDivObj) {
+      // Gelecek ilan yok — son ödemeyi goster
+      nextDivDateHtml =
+        '<span style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap">' +
+        fDate(lastPastDivObj.date) + '</span>' +
+        '<span style="font-size:9px;background:var(--bg2);color:var(--muted2);padding:1px 5px;border-radius:4px;margin-left:4px">son ödeme</span>';
+    } else {
+      nextDivDateHtml = '<span style="color:var(--muted2);font-size:10px">Taranıyor…</span>';
+    }
 
     const row = document.createElement('tr');
     row.innerHTML = `
@@ -2011,10 +2028,10 @@ function renderDividends() {
   const elSumYoCSub = document.getElementById('dSumYoCSub');
   if (elSumYoCSub) elSumYoCSub.textContent = `Gelecek YoC: %${fmtN(upYoCPort, 2, 2)}`;
 
-  // ── Gelecek Temettü Takvimi tablosunu doldur ──
-  const cutoffDate = '2026-06-03';
-  const futureDivs = allDivs.filter(d => d.date > cutoffDate);
-  futureDivs.sort((a, b) => a.date.localeCompare(b.date)); // en yakın tarih üstte
+  // ── Gelecek Temettü Takvimi tablosunu doldur (BUGUNDAN sonraki dinamik) ──
+  const todayForFilter = new Date().toISOString().split('T')[0];
+  const futureDivs = allDivs.filter(d => d.date >= todayForFilter);
+  futureDivs.sort((a, b) => a.date.localeCompare(b.date));
 
   const futureTbody = document.getElementById('divFutureTableBody');
   if (futureTbody) {
@@ -2026,11 +2043,10 @@ function renderDividends() {
         futTotNet   += d.net;
         futTotUSD   += d.netUSD;
         const stockName = (portfolio[d.stockIndex] || {}).name || '';
-        // Kaç gün kaldı?
         const daysLeft = Math.ceil((new Date(d.date) - new Date()) / 86400000);
         const daysTag = daysLeft >= 0
-          ? '<span style="font-size:9px;background:var(--teal-l);color:var(--teal);padding:1px 5px;border-radius:4px;margin-left:4px">' + daysLeft + ' gün</span>'
-          : '<span style="font-size:9px;background:var(--bg2);color:var(--muted);padding:1px 5px;border-radius:4px;margin-left:4px">geçti</span>';
+          ? '<span style="font-size:9px;background:var(--teal-l);color:var(--teal);padding:1px 5px;border-radius:4px;margin-left:4px">' + daysLeft + ' gun</span>'
+          : '<span style="font-size:9px;background:var(--bg2);color:var(--muted);padding:1px 5px;border-radius:4px;margin-left:4px">gecti</span>';
         const row = document.createElement('tr');
         row.innerHTML =
           '<td style="white-space:nowrap">' + fDate(d.date) + daysTag + '</td>' +
@@ -2044,22 +2060,27 @@ function renderDividends() {
           '<td style="color:var(--blue)">' + fUSD(d.netUSD) + '</td>';
         futureTbody.appendChild(row);
       });
-      // TOPLAM satırı
       const totRow = document.createElement('tr');
       totRow.style.fontWeight = 'bold';
       totRow.style.background = 'var(--teal-l)';
       totRow.innerHTML =
-        '<td colspan="5" style="color:var(--teal)">GELECEK TOPLAM (' + futureDivs.length + ' ödeme)</td>' +
+        '<td colspan="5" style="color:var(--teal)">GELECEK TOPLAM (' + futureDivs.length + ' odeme)</td>' +
         '<td>' + fTL(futTotGross) + '</td>' +
         '<td style="color:var(--red)">' + fTL(futTotGross * 0.15) + '</td>' +
         '<td style="color:var(--teal)">' + fTL(futTotNet) + '</td>' +
         '<td style="color:var(--blue)">' + fUSD(futTotUSD) + '</td>';
       futureTbody.appendChild(totRow);
-
       const elFutTotals = document.getElementById('divFutureTotals');
       if (elFutTotals) elFutTotals.textContent = futureDivs.length + ' beklenen odeme · Net: ' + fTL(futTotNet) + ' / ' + fUSD(futTotUSD);
     } else {
-      futureTbody.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:20px;">Henuz gelecek temettü kaydedilmedi. Otomatik tarama bekleniyor…</td></tr>';
+      // Şirketler bir sonraki temettuyu henuz ilan etmedi — bunu ac ikca goster
+      const lastDivDate = allDivs.length > 0 ? allDivs.slice().sort((a,b)=>b.date.localeCompare(a.date))[0].date : null;
+      const msg = lastDivDate
+        ? 'Portfoydeki sirketler bir sonraki temettuyü henuz ilan etmedi. ' +
+          'Son odeme: ' + fDate(lastDivDate) + ' · Yahoo Finance yeni ilan yaptiginda otomatik guncellenir.'
+        : 'Temettü verisi henuz yüklenmedi. Sayfa acildiktan ~5 saniye sonra otomatik tarama baslar.';
+      futureTbody.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:24px;font-size:12px;line-height:1.7">' +
+        '<div style="font-size:22px;margin-bottom:8px">📭</div>' + msg + '</td></tr>';
       const elFutTotals = document.getElementById('divFutureTotals');
       if (elFutTotals) elFutTotals.textContent = '';
     }
