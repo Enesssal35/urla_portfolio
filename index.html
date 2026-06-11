@@ -603,7 +603,7 @@ async function fetchFromPricesJson() {
   const ctrl = new AbortController();
   const tid  = setTimeout(() => ctrl.abort(), 5000);
   try {
-    const res = await fetch('prices.json', { signal: ctrl.signal, cache: 'no-cache' });
+    const res = await fetch('prices.json?t=' + Date.now(), { signal: ctrl.signal, cache: 'no-cache' });
     clearTimeout(tid);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
