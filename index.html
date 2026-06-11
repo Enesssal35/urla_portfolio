@@ -1700,6 +1700,220 @@ function saveScanResults() {
   closeDivScanModal();
 }
 
+// ── KAP YEDEK VE CANLI VERİ ENTEGRASYONU ──
+const KAP_BACKUP_DIVIDENDS = {
+  "EGEEN": { "ticker": "EGEEN", "ex_date": null, "pay_date": null, "gross": 0.0, "net": 0.0, "disclosure_index": 1576165, "publish_date": "26.03.2026 14:00:05", "summary": "2025 yılı kar payı dağıtımının 26.03.2026 tarihinde gerçekleştirilen Genel Kurul'da görüşülmesi hk." },
+  "FROTO": { "ticker": "FROTO", "ex_date": "2026-03-16", "pay_date": "2026-03-18", "gross": 3.64, "net": 3.094, "disclosure_index": 1571600, "publish_date": "12.03.2026 13:36:14", "summary": "Olağan Genel Kurul Kar Dağıtım Sonucu" },
+  "OTKAR": { "ticker": "OTKAR", "ex_date": null, "pay_date": null, "gross": 0.0, "net": 0.0, "disclosure_index": 1569957, "publish_date": "10.03.2026 19:06:53", "summary": "2025 Yılı Kar Dağıtım Önerisi'nin Olağan Genel Kurul'da kabulü" },
+  "PGSUS": { "ticker": "PGSUS", "ex_date": null, "pay_date": null, "gross": 0.0, "net": 0.0, "disclosure_index": 1580370, "publish_date": "31.03.2026 15:16:46", "summary": "2025 Yılı Dönem Karının Kullanımına İlişkin Genel Kurul Kararı" },
+  "BRSAN": { "ticker": "BRSAN", "ex_date": null, "pay_date": null, "gross": 0.0, "net": 0.0, "disclosure_index": 1598380, "publish_date": "28.04.2026 19:30:52", "summary": "Kar Payı Dağıtım Kararı" },
+  "CLEBI": { "ticker": "CLEBI", "ex_date": "2026-04-24", "pay_date": "2026-04-28", "gross": 103.0, "net": 87.55, "disclosure_index": 1594222, "publish_date": "16.04.2026 16:27:50", "summary": "2025 yılı Kar Payı Dağıtım İşlemlerine İlişkin Bildirim" },
+  "ISMEN": { "ticker": "ISMEN", "ex_date": "2026-04-01", "pay_date": "2026-04-03", "gross": 3.1666666, "net": 2.6916666, "disclosure_index": 1579549, "publish_date": "30.03.2026 22:08:09", "summary": "Genel Kurul'un kar dağıtım kararı" },
+  "ANSGR": { "ticker": "ANSGR", "ex_date": "2026-04-01", "pay_date": "2026-04-03", "gross": 1.375, "net": 1.16875, "disclosure_index": 1579442, "publish_date": "30.03.2026 21:15:17", "summary": "Nakit Kar Payı Dağıtımı" },
+  "LOGO": { "ticker": "LOGO", "ex_date": "2026-06-15", "pay_date": "2026-06-17", "gross": 5.2631578, "net": 4.4736841, "disclosure_index": 1616038, "publish_date": "10.06.2026 18:29:55", "summary": "Kesinleşen nakit kar payı hak kullanım tarihi hk." },
+  "SODSN": { "ticker": "SODSN", "ex_date": null, "pay_date": null, "gross": 0.0, "net": 0.0, "disclosure_index": 1586049, "publish_date": "07.04.2026 14:35:09", "summary": "Kar Dağıtım Önerisinin Olağan Genel Kurul Toplantısında Onaylanması" },
+  "LKMNH": { "ticker": "LKMNH", "ex_date": "2026-05-20", "pay_date": "2026-05-22", "gross": 0.4629628, "net": 0.3935182, "disclosure_index": 1572702, "publish_date": "14.03.2026 20:17:26", "summary": "2025 Yılı Kar Payı Dağıtımı Yönetim Kurulu Teklifinin Onaylanması" },
+  "ALKA": { "ticker": "ALKA", "ex_date": null, "pay_date": null, "gross": 0.0, "net": 0.0, "disclosure_index": 1587198, "publish_date": "07.04.2026 19:43:50", "summary": "Olağan Genel Kurul Sonrası Kar Dağıtımına İlişkin Bilgilendirme" },
+  "ALTNY": { "ticker": "ALTNY", "ex_date": null, "pay_date": null, "gross": 0.0, "net": 0.0, "disclosure_index": 1613885, "publish_date": "05.06.2026 17:42:35", "summary": "Kar Payı Dağıtımına İlişkin Genel Kurulu Kararı" }
+};
+
+function parseKAPAnnouncement(htmlText, ticker) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlText, 'text/html');
+  const tables = Array.from(doc.querySelectorAll('table'));
+  
+  let exDate = null;
+  let payDate = null;
+  let gross = 0;
+  let net = 0;
+  
+  // 1. Parse Dates (reversed order)
+  for (let i = tables.length - 1; i >= 0; i--) {
+    const table = tables[i];
+    const tText = table.textContent || '';
+    if (table.querySelector('table')) continue; // Skip container tables
+    if (tText.includes('Hak Kullanım Tarihi') || tText.includes('Ödeme Tarihi')) {
+      const rows = Array.from(table.querySelectorAll('tr'));
+      for (const row of rows) {
+        const cols = Array.from(row.querySelectorAll('td, th')).map(c => (c.textContent || '').trim());
+        if (cols.length >= 4 && /peşin|1\.\s*taksit|2\.\s*taksit|ödemeler/i.test(cols[0])) {
+          const parseDateStr = (str) => {
+            if (!str || str === '-' || str === '.') return null;
+            const parts = str.split('.');
+            if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD
+            return null;
+          };
+          exDate = parseDateStr(cols[2]) || parseDateStr(cols[1]);
+          payDate = parseDateStr(cols[3]);
+          break;
+        }
+      }
+      if (exDate) break;
+    }
+  }
+  
+  const cleanFloatStr = (str) => {
+    if (!str || str === '-' || str === '.') return 0;
+    const clean = str.replace(/\./g, '').replace(',', '.');
+    return parseFloat(clean) || 0;
+  };
+  
+  // 2. Parse Amounts (reversed order)
+  for (let i = tables.length - 1; i >= 0; i--) {
+    const table = tables[i];
+    const tText = table.textContent || '';
+    if (table.querySelector('table')) continue; // Skip container tables
+    if (tText.includes('1 TL Nominal Değerli Paya') || tText.includes('Paya Ödenecek Nakit Kar Payı - Brüt')) {
+      const rows = Array.from(table.querySelectorAll('tr'));
+      for (const row of rows) {
+        const cols = Array.from(row.querySelectorAll('td, th')).map(c => (c.textContent || '').trim());
+        if (cols.length >= 6) {
+          if (cols[0].toLowerCase().includes('görmüyor')) continue; // Skip non-traded groups
+          
+          let isCandidate = false;
+          const col0Upper = cols[0].toUpperCase();
+          if (col0Upper.includes(ticker.toUpperCase())) isCandidate = true;
+          else if (/A\s*GRUBU|B\s*GRUBU|C\s*GRUBU/i.test(cols[0])) isCandidate = true;
+          else if (col0Upper.includes('BIST') || col0Upper.includes('FROTO') || col0Upper.includes('EGEEN')) isCandidate = true;
+          else if (/peşin|1\.\s*taksit/i.test(cols[1])) isCandidate = true;
+          
+          if (isCandidate) {
+            const gVal = cleanFloatStr(cols[2]);
+            const nVal = cleanFloatStr(cols[5]);
+            if (gross === 0 || gVal > 0) {
+              gross = gVal;
+              net = nVal;
+            }
+          }
+        }
+      }
+      if (gross > 0) break;
+    }
+  }
+  
+  return { exDate, payDate, gross, net };
+}
+
+async function scanKAPDividendsLive() {
+  const companyIds = {
+    'EGEEN': '1DE05DAA8254073AE0530A4A622A2EBD',
+    'FROTO': '4028e4a140f2ed71014106890fae0138',
+    'OTKAR': '4028e4a140ee35c70140ee4316b3001d',
+    'PGSUS': '4028e4a2422d9a78014232e751bc22a4',
+    'BRSAN': '4028e4a140f2ed7201412ac9ca5d06e6',
+    'CLEBI': '4028e4a140ee84900140f1f1584c0015',
+    'ISMEN': '4028e4a140f275530140f277aa100008',
+    'ANSGR': '4028e4a140e95bea0140ed21b5c10078',
+    'LOGO': '4028e4a14158e41e01415b41210a6e8c',
+    'SODSN': '4028e4a140f2ed7201412ad04fdc071d',
+    'LKMNH': '4028e4a24158e42401415f1d4417412e',
+    'ALKA': '4028e4a2416e697d01416f39965a5eb5',
+    'ALTNY': '8acae2c58b2fa64e018f3d2d712476e2'
+  };
+
+  console.log("KAP'tan canlı temettü taraması başlatılıyor...");
+  
+  let proxyBase = customProxy ? customProxy.trim() : '';
+  if (proxyBase && !proxyBase.endsWith('/') && !proxyBase.includes('?')) {
+    proxyBase += '/';
+  }
+  const buildProxyUrl = (targetUrl) => {
+    if (!proxyBase) return targetUrl;
+    if (proxyBase.includes('?')) {
+      if (proxyBase.endsWith('url=')) return proxyBase + encodeURIComponent(targetUrl);
+      else if (proxyBase.includes('url=')) return proxyBase.replace('url=', 'url=' + encodeURIComponent(targetUrl));
+      else return proxyBase + (proxyBase.endsWith('&') ? '' : '&') + 'url=' + encodeURIComponent(targetUrl);
+    } else {
+      return proxyBase + targetUrl;
+    }
+  };
+
+  let successCount = 0;
+  let stored = JSON.parse(localStorage.getItem('kapLiveDividends') || '{}');
+
+  for (const s of portfolio) {
+    const rawTicker = s.ticker.replace('.IS', '');
+    const cid = companyIds[rawTicker];
+    if (!cid) continue;
+
+    try {
+      const criteriaUrl = buildProxyUrl('https://www.kap.org.tr/tr/api/disclosure/members/byCriteria');
+      const payload = {
+        fromDate: "2026-01-01",
+        toDate: new Date().toISOString().split('T')[0],
+        disclosureClass: "ODA",
+        subjectList: [],
+        mkkMemberOidList: [cid],
+        inactiveMkkMemberOidList: [],
+        bdkMemberOidList: [],
+        fromSrc: false,
+        disclosureIndexList: []
+      };
+
+      const res = await fetch(criteriaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        console.warn(`KAP API query failed for ${rawTicker}: HTTP ${res.status}`);
+        continue;
+      }
+
+      const disclosures = await res.json();
+      const divDiscs = disclosures.filter(d => d.subject === 'Kar Payı Dağıtım İşlemlerine İlişkin Bildirim');
+      if (divDiscs.length === 0) continue;
+
+      divDiscs.sort((a, b) => {
+        const parsePubDate = (str) => {
+          if (!str) return 0;
+          const [d, t] = str.split(' ');
+          const [day, month, year] = d.split('.');
+          const [h, m, sec] = t.split(':');
+          return new Date(year, month - 1, day, h, m, sec).getTime();
+        };
+        return parsePubDate(b.publishDate) - parsePubDate(a.publishDate);
+      });
+
+      const latestDisc = divDiscs[0];
+      const discIndex = latestDisc.disclosureIndex;
+
+      const detailUrl = buildProxyUrl(`https://www.kap.org.tr/tr/Bildirim/${discIndex}`);
+      const dRes = await fetch(detailUrl);
+      if (!dRes.ok) continue;
+
+      const htmlText = await dRes.text();
+      const parsed = parseKAPAnnouncement(htmlText, rawTicker);
+
+      if (parsed.exDate && parsed.gross > 0) {
+        console.log(`KAP Live parsed for ${rawTicker}: Ex-Date=${parsed.exDate}, Gross=${parsed.gross}, Net=${parsed.net}`);
+        stored[rawTicker] = {
+          ticker: rawTicker,
+          ex_date: parsed.exDate,
+          pay_date: parsed.payDate,
+          gross: parsed.gross,
+          net: parsed.net,
+          disclosure_index: discIndex,
+          publish_date: latestDisc.publishDate,
+          summary: latestDisc.summary
+        };
+        successCount++;
+      }
+    } catch (err) {
+      console.warn(`Error scanning KAP live for ${rawTicker}:`, err.message);
+    }
+  }
+
+  if (successCount > 0) {
+    console.log(`KAP'tan ${successCount} hissenin temettü verileri canlı olarak güncellendi.`);
+    localStorage.setItem('kapLiveDividends', JSON.stringify(stored));
+    render();
+  }
+}
+
 // ── CANLI VE SESSİZ TEMETTÜ TARAMA MOTORU ──
 async function autoScanDividendsSilent() {
   try {
@@ -1898,6 +2112,55 @@ function showToast(msg) {
 }
 
 function renderDividends() {
+  // Merge KAP dividends into portfolio
+  const kapLive = JSON.parse(localStorage.getItem('kapLiveDividends') || 'null') || KAP_BACKUP_DIVIDENDS;
+  portfolio.forEach(s => {
+    const rawTicker = s.ticker.replace('.IS', '');
+    const kapDiv = kapLive[rawTicker];
+    if (kapDiv && kapDiv.ex_date && kapDiv.gross > 0) {
+      if (!s.dividends) s.dividends = [];
+      const exDateStr = kapDiv.ex_date;
+      const existingIdx = s.dividends.findIndex(d => d.date === exDateStr);
+      
+      let lotsCount = 0;
+      if (s.lots) {
+        s.lots.forEach(l => {
+          lotsCount += (l.qty || 0);
+        });
+      }
+      
+      if (lotsCount > 0) {
+        const grossPerShare = kapDiv.gross;
+        const gross = grossPerShare * lotsCount;
+        const tax = gross * 0.15;
+        const net = gross - tax;
+        const netUSD = usdTry > 0 ? net / usdTry : 0;
+        
+        const newDivItem = {
+          date: exDateStr,
+          grossPerShare,
+          qty: lotsCount,
+          withholdingPct: 15,
+          tax,
+          gross,
+          net,
+          fx: usdTry,
+          netUSD,
+          isKAP: true,
+          publishDate: kapDiv.publish_date,
+          disclosureIndex: kapDiv.disclosure_index,
+          summary: kapDiv.summary
+        };
+        
+        if (existingIdx === -1) {
+          s.dividends.push(newDivItem);
+        } else {
+          s.dividends[existingIdx] = { ...s.dividends[existingIdx], ...newDivItem };
+        }
+      }
+    }
+  });
+
   let totGross = 0, totNet = 0, totUSD = 0, totCost = 0;
   let upGross = 0, upNet = 0, upUSD = 0;
   let hasDividendsAny = false;
@@ -1980,7 +2243,8 @@ function renderDividends() {
           net: d.net || 0,
           netUSD: d.netUSD || 0,
           stockIndex: i,
-          divIndex: di
+          divIndex: di,
+          isKAP: d.isKAP || false
         });
       });
     }
@@ -2047,9 +2311,12 @@ function renderDividends() {
         const daysTag = daysLeft >= 0
           ? '<span style="font-size:9px;background:var(--teal-l);color:var(--teal);padding:1px 5px;border-radius:4px;margin-left:4px">' + daysLeft + ' gun</span>'
           : '<span style="font-size:9px;background:var(--bg2);color:var(--muted);padding:1px 5px;border-radius:4px;margin-left:4px">gecti</span>';
+        const kapTag = d.isKAP
+          ? '<span style="font-size:9px;background:rgba(10,158,122,0.15);color:var(--teal);border:1px solid var(--teal);padding:0px 4px;border-radius:4px;margin-left:4px;font-weight:700">KAP</span>'
+          : '';
         const row = document.createElement('tr');
         row.innerHTML =
-          '<td style="white-space:nowrap">' + fDate(d.date) + daysTag + '</td>' +
+          '<td style="white-space:nowrap">' + fDate(d.date) + daysTag + kapTag + '</td>' +
           '<td style="font-weight:bold;color:' + d.color + ';cursor:pointer" onclick="openPanel(' + d.stockIndex + ')">' + d.ticker + '</td>' +
           '<td style="font-size:10px;color:var(--ink2)">' + stockName + '</td>' +
           '<td>' + fTL(d.grossPerShare) + '</td>' +
