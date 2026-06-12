@@ -236,7 +236,38 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
   .sc-val{font-size:14px;}
   .treemap{grid-template-columns:repeat(8,1fr);}
 }
+/* ── TEMETTÜ TAKİP ── */
+.div-section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;margin-bottom:24px;}
+.div-sum-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
+.div-scard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.div-scard-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;font-family:var(--mono);margin-bottom:4px;}
+.div-scard-val{font-size:16px;font-weight:700;color:var(--ink);font-family:var(--mono);}
+.div-scard-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.div-filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+.div-fbtn{height:30px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--ink2);font-size:11px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:.15s;}
+.div-fbtn:hover{background:var(--border);}
+.div-fbtn.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+.div-table-wrap{overflow-x:auto;}
+.div-tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.div-tbl th{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;font-family:var(--mono);}
+.div-tbl td{padding:9px 10px;border-bottom:1px solid var(--border2);vertical-align:middle;white-space:nowrap;}
+.div-tbl tr:last-child.div-data-row td{border-bottom:none;}
+.div-tbl tr.div-data-row:hover td{background:var(--bg2);}
+.div-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;}
+.div-badge.paid{background:var(--teal-l);color:var(--teal);}
+.div-badge.pending{background:var(--blue-l);color:var(--blue);}
+.div-badge.soon{background:var(--gold-l);color:var(--gold);}
+.div-inline-inp{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:3px 6px;font-size:11px;font-family:var(--mono);color:var(--ink);text-align:right;}
+.div-inline-inp:focus{outline:none;border-color:var(--teal);background:var(--teal-l);}
+.div-sum-row td{background:var(--bg2);font-weight:700;border-top:2px solid var(--border);}
+.div-scan-pill{display:inline-flex;align-items:center;gap:6px;margin-left:auto;}
+.div-scan-dot{width:7px;height:7px;border-radius:50%;background:var(--muted2);flex-shrink:0;}
+.div-scan-dot.scanning{background:var(--gold);animation:div-pulse 1s infinite;}
+.div-scan-dot.found{background:var(--teal);}
+@keyframes div-pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+@media(max-width:768px){.div-sum-cards{grid-template-columns:repeat(2,1fr);}}
 </style>
+
 </head>
 <body>
 
@@ -373,7 +404,78 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
   </div>
   <canvas id="barChart" style="width:100%;min-height:260px;max-height:320px"></canvas>
 </div>
+
+<!-- ── TEMETTÜ TAKİP ── -->
+<div class="sec" style="margin-top:8px">Temettü Takibi — 3 Haziran 2026 Sonrası</div>
+<div class="div-section-card">
+
+  <!-- Özet Kartları -->
+  <div class="div-sum-cards">
+    <div class="div-scard">
+      <div class="div-scard-lbl">Toplam Brüt</div>
+      <div class="div-scard-val" id="dtSumBrut">—</div>
+      <div class="div-scard-sub">3 Haz 2026 sonrası</div>
+    </div>
+    <div class="div-scard">
+      <div class="div-scard-lbl">Toplam Net</div>
+      <div class="div-scard-val" id="dtSumNet" style="color:var(--teal)">—</div>
+      <div class="div-scard-sub">Stopaj düşülmüş</div>
+    </div>
+    <div class="div-scard">
+      <div class="div-scard-lbl">Hesapta (Yatırıldı)</div>
+      <div class="div-scard-val" id="dtSumPaid" style="color:var(--blue)">—</div>
+      <div class="div-scard-sub">Ödeme tarihi geçti</div>
+    </div>
+    <div class="div-scard">
+      <div class="div-scard-lbl">Bekliyor</div>
+      <div class="div-scard-val" id="dtSumPending" style="color:var(--gold)">—</div>
+      <div class="div-scard-sub">Henüz yatmayan</div>
+    </div>
+  </div>
+
+  <!-- Filtre & Tarama Çubuğu -->
+  <div class="div-filter-row">
+    <button class="div-fbtn active" id="divFAll"     onclick="filterDivTable('all')">Tümü</button>
+    <button class="div-fbtn"        id="divFPaid"    onclick="filterDivTable('paid')">✅ Yatırıldı</button>
+    <button class="div-fbtn"        id="divFSoon"    onclick="filterDivTable('soon')">🏦 İşlemde</button>
+    <button class="div-fbtn"        id="divFPending" onclick="filterDivTable('pending')">📅 Bekliyor</button>
+    <div class="div-scan-pill">
+      <div class="div-scan-dot" id="divScanDot"></div>
+      <span id="divScanText" style="font-size:10px;color:var(--muted)">—</span>
+      <button class="div-fbtn" onclick="manualDivScan()" title="KAP'tan yeni temettü ara" style="margin-left:4px">🔄 Şimdi Tara</button>
+    </div>
+  </div>
+
+  <!-- Tablo -->
+  <div class="div-table-wrap">
+    <table class="div-tbl" id="divTable">
+      <thead>
+        <tr>
+          <th>Hisse</th>
+          <th>Lot</th>
+          <th>Hak Kullanım</th>
+          <th>Ödeme Tarihi</th>
+          <th>Brüt/Pay (₺)</th>
+          <th>Stopaj %</th>
+          <th>Net/Pay (₺)</th>
+          <th>Toplam Brüt</th>
+          <th>Toplam Net</th>
+          <th>Durum</th>
+        </tr>
+      </thead>
+      <tbody id="divTbody">
+        <tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;font-size:11px">⏳ Veriler yükleniyor…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="divEmptyMsg" style="display:none;text-align:center;color:var(--muted);font-size:11px;padding:16px 0">
+    3 Haziran 2026 sonrasında portföyünüzdeki hisselerden henüz temettü bildirimi bulunamadı.<br>
+    Otomatik tarama her 6 saatte bir devam etmektedir.
+  </div>
+</div>
+
 </main>
+
 
 <!-- ── PANEL ── -->
 <div class="panel" id="panel">
@@ -908,7 +1010,7 @@ function persist() {
 // ══════════════════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════════════════
-function render() { renderSummary(); renderGrid(); renderAlloc(); if (panelIdx >= 0) refreshPanel(); renderBarChart(); }
+function render() { renderSummary(); renderGrid(); renderAlloc(); if (panelIdx >= 0) refreshPanel(); renderBarChart(); renderDivTable(); }
 
 function renderSummary() {
   let totTL=0, totUSD=0, costTL=0, costUSD=0;
@@ -1404,11 +1506,402 @@ function renderBarChart() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// TEMETTÜ TAKİP SİSTEMİ — 3 Haziran 2026 Sonrası
+// ══════════════════════════════════════════════════════════════
+
+// Bilinen statik yedek veri bankası (kesinti varsa fallback)
+const DIV_STATIC = [
+  {
+    ticker: 'LOGO.IS',
+    exDate: '2026-06-15',
+    payDate: '2026-06-17',
+    grossPerShare: 5.2631578,
+    stopaj: 15,
+    source: 'static'
+  },
+  {
+    ticker: 'LKMNH.IS',
+    exDate: '2026-09-28',
+    payDate: '2026-09-30',
+    grossPerShare: 0.2314814,
+    stopaj: 15,
+    source: 'static'
+  }
+];
+
+// KAP şirket IDleri — portföydeki tüm hisseler
+const KAP_CID = {
+  'EGEEN': '1DE05DAA8254073AE0530A4A622A2EBD',
+  'FROTO': '4028e4a140f2ed71014106890fae0138',
+  'OTKAR': '4028e4a140ee35c70140ee4316b3001d',
+  'PGSUS': '4028e4a2422d9a78014232e751bc22a4',
+  'BRSAN': '4028e4a140f2ed7201412ac9ca5d06e6',
+  'CLEBI': '4028e4a140ee84900140f1f1584c0015',
+  'ISMEN': '4028e4a140f275530140f277aa100008',
+  'ANSGR': '4028e4a140e95bea0140ed21b5c10078',
+  'LOGO':  '4028e4a14158e41e01415b41210a6e8c',
+  'SODSN': '4028e4a140f2ed7201412ad04fdc071d',
+  'LKMNH': '4028e4a24158e42401415f1d4417412e',
+  'ALKA':  '4028e4a2416e697d01416f39965a5eb5',
+  'ALTNY': '8acae2c58b2fa64e018f3d2d712476e2'
+};
+
+const DIV_CUTOFF = '2026-06-03';
+let divRecords = [];
+let divFilter  = 'all';
+
+function loadDivRecords() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('avDivRecords') || 'null');
+    divRecords = (stored && Array.isArray(stored)) ? stored : [];
+  } catch(e) { divRecords = []; }
+  // Merge static records (add if missing)
+  DIV_STATIC.forEach(sd => {
+    const exists = divRecords.some(r => r.ticker === sd.ticker && r.exDate === sd.exDate);
+    if (!exists) divRecords.push({...sd});
+  });
+  saveDivRecords();
+}
+
+function saveDivRecords() {
+  localStorage.setItem('avDivRecords', JSON.stringify(divRecords));
+}
+
+function getDivLots(ticker) {
+  const s = portfolio.find(p => p.ticker === ticker);
+  if (!s || !s.lots) return 0;
+  return s.lots.reduce((sum, l) => sum + (l.qty || 0), 0);
+}
+
+function getDivStatus(r) {
+  const now = today();
+  if (r.payDate && now >= r.payDate) return 'paid';
+  if (r.exDate  && now >= r.exDate)  return 'soon';
+  return 'pending';
+}
+
+function calcDivRow(r) {
+  const gross     = (r.overrideGross  !== undefined && r.overrideGross  !== null) ? r.overrideGross  : r.grossPerShare;
+  const stopajPct = (r.overrideStopaj !== undefined && r.overrideStopaj !== null) ? r.overrideStopaj : r.stopaj;
+  const net       = gross * (1 - stopajPct / 100);
+  const lots      = getDivLots(r.ticker);
+  return { gross, stopajPct, net, lots, totalGross: gross * lots, totalNet: net * lots };
+}
+
+function renderDivTable() {
+  const tbody    = document.getElementById('divTbody');
+  const emptyMsg = document.getElementById('divEmptyMsg');
+  if (!tbody) return;
+
+  // Only records after cutoff
+  const eligible = divRecords.filter(r => r.exDate > DIV_CUTOFF);
+
+  // Summary totals across ALL eligible (not filtered)
+  let totBrut = 0, totNet = 0, totPaid = 0, totPending = 0;
+  eligible.forEach(r => {
+    const c = calcDivRow(r);
+    totBrut    += c.totalGross;
+    totNet     += c.totalNet;
+    if (getDivStatus(r) === 'paid') totPaid    += c.totalNet;
+    else                            totPending  += c.totalNet;
+  });
+  const ge = id => document.getElementById(id);
+  if (ge('dtSumBrut'))    ge('dtSumBrut').textContent    = fTL(totBrut);
+  if (ge('dtSumNet'))     ge('dtSumNet').textContent     = fTL(totNet);
+  if (ge('dtSumPaid'))    ge('dtSumPaid').textContent    = fTL(totPaid);
+  if (ge('dtSumPending')) ge('dtSumPending').textContent = fTL(totPending);
+
+  // Apply status filter
+  const filtered = divFilter === 'all' ? eligible
+    : eligible.filter(r => getDivStatus(r) === divFilter);
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    if (emptyMsg) emptyMsg.style.display = eligible.length ? '' : '';
+    if (emptyMsg) emptyMsg.style.display = '';
+    return;
+  }
+  if (emptyMsg) emptyMsg.style.display = 'none';
+
+  const sorted = [...filtered].sort((a, b) => (a.exDate || '').localeCompare(b.exDate || ''));
+
+  let html = '';
+  sorted.forEach(r => {
+    const c       = calcDivRow(r);
+    const status  = getDivStatus(r);
+    const ticker  = r.ticker.replace('.IS', '');
+    const stock   = portfolio.find(p => p.ticker === r.ticker);
+    const col     = stock ? (stock.color || 'var(--teal)') : 'var(--teal)';
+    const name    = stock ? (stock.name || ticker) : ticker;
+    const ridx    = divRecords.indexOf(r);
+
+    const badge = status === 'paid'
+      ? '<span class="div-badge paid">✅ Yatırıldı</span>'
+      : status === 'soon'
+      ? '<span class="div-badge soon">🏦 İşlemde</span>'
+      : '<span class="div-badge pending">📅 Bekliyor</span>';
+
+    const lotsHtml = c.lots > 0
+      ? `<span style="font-weight:700">${c.lots.toLocaleString('tr-TR')}</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+
+    html += `<tr class="div-data-row" data-status="${status}">
+      <td>
+        <div style="font-weight:700;color:${col}">${ticker}</div>
+        <div style="font-size:10px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis">${name}</div>
+      </td>
+      <td style="font-family:var(--mono)">${lotsHtml}</td>
+      <td style="font-family:var(--mono);font-size:11px">${fDate(r.exDate)}</td>
+      <td style="font-family:var(--mono);font-size:11px">${r.payDate ? fDate(r.payDate) : '—'}</td>
+      <td>
+        <input class="div-inline-inp" type="number" step="0.0001" min="0"
+          value="${c.gross.toFixed(4)}"
+          onchange="updateDivRecord(${ridx},'gross',this.value)"
+          title="Brüt temettü/pay — düzenlemek için tıklayın">
+      </td>
+      <td>
+        <input class="div-inline-inp" type="number" step="1" min="0" max="100"
+          value="${c.stopajPct}"
+          style="width:58px"
+          onchange="updateDivRecord(${ridx},'stopaj',this.value)"
+          title="Stopaj oranı %">
+      </td>
+      <td style="font-family:var(--mono);font-weight:600;color:var(--teal)">${fTL(c.net)}</td>
+      <td style="font-family:var(--mono)">${c.lots > 0 ? fTL(c.totalGross) : '—'}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--teal)">${c.lots > 0 ? fTL(c.totalNet) : '—'}</td>
+      <td>${badge}</td>
+    </tr>`;
+  });
+
+  // Toplam satırı (birden fazla kayıt varsa)
+  if (sorted.length > 1) {
+    const fG = sorted.reduce((s, r) => s + calcDivRow(r).totalGross, 0);
+    const fN = sorted.reduce((s, r) => s + calcDivRow(r).totalNet,   0);
+    html += `<tr class="div-sum-row">
+      <td colspan="7" style="color:var(--muted);font-size:10px;font-weight:400">TOPLAM · ${sorted.length} kayıt gösteriliyor</td>
+      <td style="font-family:var(--mono)">${fTL(fG)}</td>
+      <td style="font-family:var(--mono);color:var(--teal)">${fTL(fN)}</td>
+      <td></td>
+    </tr>`;
+  }
+
+  tbody.innerHTML = html;
+}
+
+function updateDivRecord(ridx, field, value) {
+  if (ridx < 0 || ridx >= divRecords.length) return;
+  const val = parseFloat(value);
+  if (isNaN(val) || val < 0) return;
+  if (field === 'gross')  divRecords[ridx].overrideGross  = val;
+  if (field === 'stopaj') divRecords[ridx].overrideStopaj = val;
+  saveDivRecords();
+  renderDivTable();
+}
+
+function filterDivTable(f) {
+  divFilter = f;
+  ['All','Paid','Soon','Pending'].forEach(k => {
+    const btn = document.getElementById('divF' + k);
+    if (btn) btn.classList.toggle('active', k.toLowerCase() === f);
+  });
+  renderDivTable();
+}
+
+// ── KAP PROXY URL ──
+function buildDivProxyUrl(url) {
+  let pb = customProxy ? customProxy.trim() : '';
+  if (!pb) return url;
+  if (!pb.endsWith('/') && !pb.includes('?')) pb += '/';
+  if (pb.includes('?')) {
+    if (pb.endsWith('url=')) return pb + encodeURIComponent(url);
+    if (pb.includes('url=')) return pb.replace('url=', 'url=' + encodeURIComponent(url));
+    return pb + (pb.endsWith('&') ? '' : '&') + 'url=' + encodeURIComponent(url);
+  }
+  return pb + url;
+}
+
+// ── KAP BİLDİRİM PARSER ──
+function parseKAPDiv(htmlText, ticker) {
+  const doc    = new DOMParser().parseFromString(htmlText, 'text/html');
+  const tables = Array.from(doc.querySelectorAll('table'));
+  let exDate = null, payDate = null, gross = 0;
+
+  const toISO = str => {
+    if (!str || str === '-' || str === '.') return null;
+    const p = str.trim().split('.');
+    if (p.length === 3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    return null;
+  };
+  const toFloat = str => {
+    if (!str || str === '-') return 0;
+    return parseFloat(str.replace(/\./g,'').replace(',','.')) || 0;
+  };
+
+  // 1. Tarihleri çek
+  for (let i = tables.length - 1; i >= 0; i--) {
+    const t  = tables[i];
+    const tt = t.textContent || '';
+    if (t.querySelector('table')) continue;
+    if (tt.includes('Hak Kullanım Tarihi') || tt.includes('Ödeme Tarihi')) {
+      for (const row of t.querySelectorAll('tr')) {
+        const cols = Array.from(row.querySelectorAll('td,th')).map(c => c.textContent.trim());
+        if (cols.length >= 4 && /peşin|1\.\s*taksit|2\.\s*taksit|ödemeler/i.test(cols[0])) {
+          exDate  = toISO(cols[2]) || toISO(cols[1]);
+          payDate = toISO(cols[3]);
+          break;
+        }
+      }
+      if (exDate) break;
+    }
+  }
+
+  // 2. Tutarları çek
+  for (let i = tables.length - 1; i >= 0; i--) {
+    const t  = tables[i];
+    const tt = t.textContent || '';
+    if (t.querySelector('table')) continue;
+    if (tt.includes('1 TL Nominal') || tt.includes('Paya Ödenecek Nakit Kar Payı - Brüt')) {
+      for (const row of t.querySelectorAll('tr')) {
+        const cols = Array.from(row.querySelectorAll('td,th')).map(c => c.textContent.trim());
+        if (cols.length >= 6) {
+          if (cols[0].toLowerCase().includes('görmüyor')) continue;
+          const isC = cols[0].toUpperCase().includes(ticker.toUpperCase())
+            || /A\s*GRUBU|B\s*GRUBU/i.test(cols[0])
+            || /peşin|1\.\s*taksit/i.test(cols[1]);
+          if (isC) { const g = toFloat(cols[2]); if (g > 0) { gross = g; } }
+        }
+      }
+      if (gross > 0) break;
+    }
+  }
+  return { exDate, payDate, gross };
+}
+
+// ── KAP SCANNER ──
+async function scanKAPForDividends(silent) {
+  const dot = document.getElementById('divScanDot');
+  const txt = document.getElementById('divScanText');
+  if (dot) dot.className = 'div-scan-dot scanning';
+  if (txt) txt.textContent = 'Taranıyor…';
+
+  let newFound = 0;
+  const toDateStr = (() => { const d = new Date(); d.setMonth(d.getMonth()+9); return d.toISOString().split('T')[0]; })();
+
+  for (const s of portfolio) {
+    const raw = s.ticker.replace('.IS','');
+    const cid = KAP_CID[raw];
+    if (!cid) continue;
+
+    try {
+      const criteriaUrl = buildDivProxyUrl('https://www.kap.org.tr/tr/api/disclosure/members/byCriteria');
+      const res = await fetch(criteriaUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromDate: '2026-01-01', toDate: toDateStr,
+          disclosureClass: 'ODA', subjectList: [],
+          mkkMemberOidList: [cid],
+          inactiveMkkMemberOidList: [], bdkMemberOidList: [],
+          fromSrc: false, disclosureIndexList: []
+        })
+      });
+      if (!res.ok) continue;
+
+      const discs = (await res.json())
+        .filter(d => d.subject === 'Kar Payı Dağıtım İşlemlerine İlişkin Bildirim')
+        .sort((a, b) => {
+          const pd = s => {
+            if (!s) return 0;
+            const [dt, tm] = s.split(' ');
+            const [day, mon, yr] = dt.split('.');
+            return new Date(yr, mon-1, day, ...(tm||'0:0:0').split(':')).getTime();
+          };
+          return pd(b.publishDate) - pd(a.publishDate);
+        });
+
+      // Son 4 bildirimi kontrol et (taksitli ödemeler için)
+      for (const disc of discs.slice(0, 4)) {
+        const dRes = await fetch(buildDivProxyUrl(`https://www.kap.org.tr/tr/Bildirim/${disc.disclosureIndex}`));
+        if (!dRes.ok) continue;
+        const parsed = parseKAPDiv(await dRes.text(), raw);
+
+        if (parsed.exDate && parsed.exDate > DIV_CUTOFF && parsed.gross > 0) {
+          const existing = divRecords.find(r => r.ticker === s.ticker && r.exDate === parsed.exDate);
+          if (!existing) {
+            // Yeni temettü kaydı eklendi!
+            divRecords.push({
+              ticker: s.ticker,
+              exDate: parsed.exDate,
+              payDate: parsed.payDate,
+              grossPerShare: parsed.gross,
+              stopaj: 15,
+              source: 'kap',
+              addedAt: new Date().toISOString(),
+              disclosureIndex: disc.disclosureIndex
+            });
+            newFound++;
+            saveDivRecords();
+            console.log(`[Temettü] Yeni kayıt eklendi: ${raw} — ${parsed.exDate} — ${parsed.gross} TL/pay`);
+          } else if (existing.source === 'kap' && Math.abs(existing.grossPerShare - parsed.gross) > 0.0001) {
+            // Güncelle
+            existing.grossPerShare = parsed.gross;
+            existing.payDate = parsed.payDate || existing.payDate;
+            saveDivRecords();
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('[Temettü] KAP tarama hatası:', raw, e.message);
+    }
+    await new Promise(r => setTimeout(r, 300)); // rate limit koruması
+  }
+
+  const scanTime = new Date().toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+  if (dot) dot.className = newFound > 0 ? 'div-scan-dot found' : 'div-scan-dot';
+  if (txt) txt.textContent = `Son: ${scanTime}${newFound > 0 ? ` · ${newFound} yeni` : ''}`;
+  localStorage.setItem('avDivLastScan', Date.now().toString());
+
+  if (newFound > 0) {
+    renderDivTable();
+    if (!silent) {
+      alert(`${newFound} yeni temettü kaydı portföyünüze eklendi!`);
+    }
+  } else if (!silent) {
+    alert('Yeni temettü bildirimi bulunamadı. Tüm kayıtlar güncel.');
+  }
+}
+
+function manualDivScan() {
+  scanKAPForDividends(false);
+}
+
+async function startDivAutoScan() {
+  loadDivRecords();
+  renderDivTable();
+
+  // Her 6 saatte bir otomatik tara
+  const lastScan  = parseInt(localStorage.getItem('avDivLastScan') || '0');
+  const SIX_HOURS = 6 * 60 * 60 * 1000;
+  if (Date.now() - lastScan > SIX_HOURS) {
+    await scanKAPForDividends(true);
+  } else {
+    const t = new Date(lastScan).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+    const txt = document.getElementById('divScanText');
+    if (txt) txt.textContent = `Son: ${t}`;
+    const dot = document.getElementById('divScanDot');
+    if (dot) dot.className = 'div-scan-dot';
+  }
+
+  setInterval(() => scanKAPForDividends(true), SIX_HOURS);
+}
+
+// ══════════════════════════════════════════════════════════════
 // BAŞLAT
 // ══════════════════════════════════════════════════════════════
 render();
 startAutoRefresh();
 window.addEventListener('resize', () => { renderGrid(); renderBarChart(); });
+setTimeout(() => startDivAutoScan(), 1500);
 
 </script>
 </body>
