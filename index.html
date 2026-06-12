@@ -486,6 +486,17 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
   </div>
 </div>
 
+<!-- ── NOTLAR ── -->
+<div class="sec" style="margin-top:8px">Notlar</div>
+<div class="div-section-card" style="padding-bottom:20px">
+  <div id="gNotesList"></div>
+  <button class="note-add-btn" id="gNoteAddBtn" onclick="showNoteInput()">+ Not Ekle</button>
+  <div id="gNoteInputWrap" style="display:none;margin-top:8px">
+    <textarea class="note-textarea" id="gNoteTextarea" placeholder="Buraya notunuzu yazın…" rows="3"></textarea>
+    <button class="note-save-btn" onclick="saveNote()" style="margin-top:6px">Kaydet</button>
+  </div>
+</div>
+
 </main>
 
 
@@ -504,15 +515,6 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
     <div class="p-sec">Alım Geçmişi</div><div id="pLots"></div>
     <div class="p-sec" id="pDivSec" style="display:none">Temettü Geçmişi — 3 Haz 2026 Sonrası</div>
     <div id="pDivHistory"></div>
-    <div class="p-sec">Notlar</div>
-    <div id="pNotesArea">
-      <div id="pNotesList"></div>
-      <button class="note-add-btn" id="pNoteAddBtn" onclick="showNoteInput()">+ Not Ekle</button>
-      <div id="pNoteInputWrap" style="display:none">
-        <textarea class="note-textarea" id="pNoteTextarea" placeholder="Buraya notunuzu yazın…" rows="3"></textarea>
-        <button class="note-save-btn" onclick="saveNote()">Kaydet</button>
-      </div>
-    </div>
     <div class="p-btns">
       <button class="pbtn pbtn-e" onclick="openEdit()">Düzenle</button>
       <button class="pbtn pbtn-d" onclick="delStock()">Sil</button>
@@ -1275,8 +1277,6 @@ function refreshPanel() {
 
   // Temettü Geçmişi
   renderPanelDivHistory(s.ticker);
-  // Notlar
-  renderNotes(s.ticker);
 }
 
 function delLot(li) {
@@ -1357,34 +1357,38 @@ function renderPanelDivHistory(ticker) {
 // NOTLAR
 // ══════════════════════════════════════════════════════════════
 
-// notlar: { [ticker]: [{id, text, createdAt}] }
-let stockNotes = {};
+// ══════════════════════════════════════════════════════════════
+// NOTLAR (Ana Sayfa — Global)
+// ══════════════════════════════════════════════════════════════
+
+let stockNotes = []; // Düz dizi, ticker bağımsız
 
 function loadNotes() {
   try {
-    stockNotes = JSON.parse(localStorage.getItem('avNotes') || '{}');
-  } catch(e) { stockNotes = {}; }
+    const raw = JSON.parse(localStorage.getItem('avNotes') || 'null');
+    // Eski format (obje) ya da yeni format (dizi) dönüştür
+    if (Array.isArray(raw)) {
+      stockNotes = raw;
+    } else if (raw && typeof raw === 'object') {
+      // Eski per-ticker objeden düüzleştir
+      stockNotes = Object.values(raw).flat();
+    } else {
+      stockNotes = [];
+    }
+  } catch(e) { stockNotes = []; }
 }
 
 function saveNotes() {
   localStorage.setItem('avNotes', JSON.stringify(stockNotes));
 }
 
-function renderNotes(ticker) {
-  const list = document.getElementById('pNotesList');
-  const wrap = document.getElementById('pNoteInputWrap');
-  const btn  = document.getElementById('pNoteAddBtn');
+function renderNotes() {
+  const list = document.getElementById('gNotesList');
   if (!list) return;
 
-  // Girdi alanını kapat, butonu göster
-  if (wrap) wrap.style.display = 'none';
-  if (btn)  btn.style.display  = '';
-  const ta = document.getElementById('pNoteTextarea');
-  if (ta) ta.value = '';
-
-  const notes = (stockNotes[ticker] || []).slice().reverse(); // en yenisi üstte
+  const notes = stockNotes.slice().reverse(); // en yenisi üstte
   if (!notes.length) {
-    list.innerHTML = `<div style="font-size:11px;color:var(--muted);padding:6px 0 4px">Henüz not eklenmedi.</div>`;
+    list.innerHTML = `<div style="font-size:11px;color:var(--muted);padding:4px 0 8px">Henüz not eklenmedi.</div>`;
     return;
   }
 
@@ -1392,10 +1396,9 @@ function renderNotes(ticker) {
     const dateStr = n.createdAt
       ? new Date(n.createdAt).toLocaleString('tr-TR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
       : '';
-    // HTML encode için basit escape
-    const safe = n.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const safe = (n.text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     return `<div class="note-card">
-      <button class="note-del-btn" onclick="deleteNote('${ticker}','${n.id}')" title="Notu sil">✕</button>
+      <button class="note-del-btn" onclick="deleteNote('${n.id}')" title="Notu sil">✕</button>
       <div class="note-card-date">${dateStr}</div>
       <div class="note-card-text">${safe}</div>
     </div>`;
@@ -1403,36 +1406,40 @@ function renderNotes(ticker) {
 }
 
 function showNoteInput() {
-  const wrap = document.getElementById('pNoteInputWrap');
-  const btn  = document.getElementById('pNoteAddBtn');
-  const ta   = document.getElementById('pNoteTextarea');
+  const wrap = document.getElementById('gNoteInputWrap');
+  const btn  = document.getElementById('gNoteAddBtn');
+  const ta   = document.getElementById('gNoteTextarea');
   if (wrap) wrap.style.display = '';
   if (btn)  btn.style.display  = 'none';
   if (ta)   { ta.value = ''; setTimeout(() => ta.focus(), 50); }
 }
 
 function saveNote() {
-  if (panelIdx < 0) return;
-  const ticker = portfolio[panelIdx].ticker;
-  const ta = document.getElementById('pNoteTextarea');
+  const ta   = document.getElementById('gNoteTextarea');
   const text = ta ? ta.value.trim() : '';
   if (!text) return;
 
-  if (!stockNotes[ticker]) stockNotes[ticker] = [];
-  stockNotes[ticker].push({
+  stockNotes.push({
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
     text,
     createdAt: new Date().toISOString()
   });
   saveNotes();
-  renderNotes(ticker);
+
+  // Input kapat, butonu göster
+  const wrap = document.getElementById('gNoteInputWrap');
+  const btn  = document.getElementById('gNoteAddBtn');
+  if (wrap) wrap.style.display = 'none';
+  if (btn)  btn.style.display  = '';
+  if (ta)   ta.value = '';
+
+  renderNotes();
 }
 
-function deleteNote(ticker, id) {
-  if (!stockNotes[ticker]) return;
-  stockNotes[ticker] = stockNotes[ticker].filter(n => n.id !== id);
+function deleteNote(id) {
+  stockNotes = stockNotes.filter(n => n.id !== id);
   saveNotes();
-  renderNotes(ticker);
+  renderNotes();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2079,7 +2086,7 @@ async function startDivAutoScan() {
 render();
 startAutoRefresh();
 window.addEventListener('resize', () => { renderGrid(); renderBarChart(); });
-loadNotes();
+loadNotes(); renderNotes();
 setTimeout(() => startDivAutoScan(), 1500);
 
 </script>
