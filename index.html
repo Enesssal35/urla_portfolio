@@ -266,6 +266,18 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
 .div-scan-dot.found{background:var(--teal);}
 @keyframes div-pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
 @media(max-width:768px){.div-sum-cards{grid-template-columns:repeat(2,1fr);}}
+/* ── NOTLAR ── */
+.note-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:8px;position:relative;}
+.note-card-date{font-size:9px;color:var(--muted);font-family:var(--mono);margin-bottom:4px;}
+.note-card-text{font-size:11px;color:var(--ink);line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+.note-del-btn{position:absolute;top:7px;right:8px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted2);padding:0;line-height:1;}
+.note-del-btn:hover{color:var(--red);}
+.note-textarea{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11px;font-family:var(--sans);color:var(--ink);resize:vertical;min-height:72px;max-height:180px;box-sizing:border-box;line-height:1.55;}
+.note-textarea:focus{outline:none;border-color:var(--teal);background:var(--teal-l);}
+.note-add-btn{width:100%;height:32px;margin-top:7px;background:var(--surface);border:1px dashed var(--border2);border-radius:8px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:var(--sans);transition:.15s;}
+.note-add-btn:hover{border-color:var(--teal);color:var(--teal);background:var(--teal-l);}
+.note-save-btn{width:100%;height:32px;margin-top:6px;background:var(--teal);border:none;border-radius:8px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--sans);transition:.15s;}
+.note-save-btn:hover{filter:brightness(1.08);}
 </style>
 
 </head>
@@ -492,6 +504,15 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
     <div class="p-sec">Alım Geçmişi</div><div id="pLots"></div>
     <div class="p-sec" id="pDivSec" style="display:none">Temettü Geçmişi — 3 Haz 2026 Sonrası</div>
     <div id="pDivHistory"></div>
+    <div class="p-sec">Notlar</div>
+    <div id="pNotesArea">
+      <div id="pNotesList"></div>
+      <button class="note-add-btn" id="pNoteAddBtn" onclick="showNoteInput()">+ Not Ekle</button>
+      <div id="pNoteInputWrap" style="display:none">
+        <textarea class="note-textarea" id="pNoteTextarea" placeholder="Buraya notunuzu yazın…" rows="3"></textarea>
+        <button class="note-save-btn" onclick="saveNote()">Kaydet</button>
+      </div>
+    </div>
     <div class="p-btns">
       <button class="pbtn pbtn-e" onclick="openEdit()">Düzenle</button>
       <button class="pbtn pbtn-d" onclick="delStock()">Sil</button>
@@ -1254,6 +1275,8 @@ function refreshPanel() {
 
   // Temettü Geçmişi
   renderPanelDivHistory(s.ticker);
+  // Notlar
+  renderNotes(s.ticker);
 }
 
 function delLot(li) {
@@ -1328,6 +1351,88 @@ function renderPanelDivHistory(ticker) {
 
   html += `</tbody></table>`;
   box.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// NOTLAR
+// ══════════════════════════════════════════════════════════════
+
+// notlar: { [ticker]: [{id, text, createdAt}] }
+let stockNotes = {};
+
+function loadNotes() {
+  try {
+    stockNotes = JSON.parse(localStorage.getItem('avNotes') || '{}');
+  } catch(e) { stockNotes = {}; }
+}
+
+function saveNotes() {
+  localStorage.setItem('avNotes', JSON.stringify(stockNotes));
+}
+
+function renderNotes(ticker) {
+  const list = document.getElementById('pNotesList');
+  const wrap = document.getElementById('pNoteInputWrap');
+  const btn  = document.getElementById('pNoteAddBtn');
+  if (!list) return;
+
+  // Girdi alanını kapat, butonu göster
+  if (wrap) wrap.style.display = 'none';
+  if (btn)  btn.style.display  = '';
+  const ta = document.getElementById('pNoteTextarea');
+  if (ta) ta.value = '';
+
+  const notes = (stockNotes[ticker] || []).slice().reverse(); // en yenisi üstte
+  if (!notes.length) {
+    list.innerHTML = `<div style="font-size:11px;color:var(--muted);padding:6px 0 4px">Henüz not eklenmedi.</div>`;
+    return;
+  }
+
+  list.innerHTML = notes.map(n => {
+    const dateStr = n.createdAt
+      ? new Date(n.createdAt).toLocaleString('tr-TR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+      : '';
+    // HTML encode için basit escape
+    const safe = n.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<div class="note-card">
+      <button class="note-del-btn" onclick="deleteNote('${ticker}','${n.id}')" title="Notu sil">✕</button>
+      <div class="note-card-date">${dateStr}</div>
+      <div class="note-card-text">${safe}</div>
+    </div>`;
+  }).join('');
+}
+
+function showNoteInput() {
+  const wrap = document.getElementById('pNoteInputWrap');
+  const btn  = document.getElementById('pNoteAddBtn');
+  const ta   = document.getElementById('pNoteTextarea');
+  if (wrap) wrap.style.display = '';
+  if (btn)  btn.style.display  = 'none';
+  if (ta)   { ta.value = ''; setTimeout(() => ta.focus(), 50); }
+}
+
+function saveNote() {
+  if (panelIdx < 0) return;
+  const ticker = portfolio[panelIdx].ticker;
+  const ta = document.getElementById('pNoteTextarea');
+  const text = ta ? ta.value.trim() : '';
+  if (!text) return;
+
+  if (!stockNotes[ticker]) stockNotes[ticker] = [];
+  stockNotes[ticker].push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    text,
+    createdAt: new Date().toISOString()
+  });
+  saveNotes();
+  renderNotes(ticker);
+}
+
+function deleteNote(ticker, id) {
+  if (!stockNotes[ticker]) return;
+  stockNotes[ticker] = stockNotes[ticker].filter(n => n.id !== id);
+  saveNotes();
+  renderNotes(ticker);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1974,6 +2079,7 @@ async function startDivAutoScan() {
 render();
 startAutoRefresh();
 window.addEventListener('resize', () => { renderGrid(); renderBarChart(); });
+loadNotes();
 setTimeout(() => startDivAutoScan(), 1500);
 
 </script>
