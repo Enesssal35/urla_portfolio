@@ -147,6 +147,7 @@ main{padding:16px 20px 80px;max-width:1800px;margin:0 auto;}
 .kz-pill.pos{background:var(--teal-l);color:var(--teal);}
 .kz-pill.neg{background:var(--red-l);color:var(--red);}
 .kz-pill.neu{background:var(--bg2);color:var(--muted);}
+.kz-pill.irr{background:var(--purple-l);color:var(--purple);}
 .stk-div{height:1px;background:var(--border);margin:8px 0 6px;}
 .stk-bar{height:2.5px;background:var(--bg2);border-radius:2px;margin-top:8px;overflow:hidden;}
 .stk-bar-fill{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.22,1,.36,1);}
@@ -999,6 +1000,61 @@ function calc(s) {
   return {totalQty, totalCostTL, totalCostUSD, avgCostTL, avgCostUSD, valTL, valUSD, kzTL, kzUSD, kzPct, kzPctUSD};
 }
 
+// ── IRR (Internal Rate of Return) — Yıllık USD Bazlı ──
+function calcIRR(s) {
+  const lots = s.lots || [];
+  if (!lots.length || !s.price || !usdTry) return null;
+
+  // Nakit akışlarını oluştur
+  const todayMs = Date.now();
+  const cashflows = [];
+
+  lots.forEach(l => {
+    if (!l.qty || !l.priceTL) return;
+    const costUSD = l.qty * l.priceTL / (l.fx || usdTry);
+    let dateMs = todayMs;
+    if (l.date) {
+      const parts = l.date.split('-');
+      if (parts.length === 3) dateMs = new Date(+parts[0], +parts[1]-1, +parts[2]).getTime();
+    }
+    cashflows.push({ amount: -costUSD, ms: dateMs });
+  });
+
+  if (!cashflows.length) return null;
+
+  // Bugünkü değer USD inflowı
+  const totalQty = lots.reduce((a, l) => a + (l.qty || 0), 0);
+  const currentValUSD = totalQty * s.price / usdTry;
+  cashflows.push({ amount: currentValUSD, ms: todayMs });
+
+  // En erken tarihe göre yıl hesapla
+  const minMs = Math.min(...cashflows.map(c => c.ms));
+  const cfs = cashflows.map(c => ({
+    amount: c.amount,
+    years: (c.ms - minMs) / (365.25 * 24 * 3600 * 1000)
+  }));
+
+  // Eğer tek bir tarihte işlem varsa veya hiç süre geçmemisse
+  const maxYears = Math.max(...cfs.map(c => c.years));
+  if (maxYears < 1 / 365) return null;
+
+  // Newton-Raphson yöntemi
+  const npv  = r => cfs.reduce((s, c) => s + c.amount / Math.pow(1 + r, c.years), 0);
+  const dnpv = r => cfs.reduce((s, c) => s - c.years * c.amount / Math.pow(1 + r, c.years + 1), 0);
+
+  let r = 0.15;
+  for (let i = 0; i < 200; i++) {
+    const f  = npv(r);
+    const df = dnpv(r);
+    if (Math.abs(df) < 1e-14) break;
+    const r2 = r - f / df;
+    if (!isFinite(r2)) break;
+    if (Math.abs(r2 - r) < 1e-9) return r2 * 100; // yüzde olarak dönüdür
+    r = Math.max(-0.9999, Math.min(100, r2));
+  }
+  return isFinite(r) ? r * 100 : null;
+}
+
 // ══════════════════════════════════════════════════════════════
 // FORMAT
 // ══════════════════════════════════════════════════════════════
@@ -1147,6 +1203,7 @@ function renderGrid() {
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           ${(hasL && hasP && c.kzPct !== null) ? `<span class="kz-pill ${c.kzPct>=0?'pos':'neg'}">${fPct(c.kzPct)} TL</span>` : ''}
           ${(hasL && hasP && c.kzPctUSD !== null) ? `<span class="kz-pill ${c.kzPctUSD>=0?'pos':'neg'}">${fPct(c.kzPctUSD)} USD</span>` : ''}
+          ${(() => { const irr = (hasL && hasP) ? calcIRR(s) : null; return irr !== null ? `<span class="kz-pill irr" title="Y\u0131ll\u0131k IRR (USD)">${irr>=0?'+':''}${irr.toFixed(1)}% IRR</span>` : ''; })()}
         </div>
         <div class="stk-bar"><div class="stk-bar-fill" style="width:${progW}%;background:${col}"></div></div>
       </div>`;
@@ -1257,7 +1314,20 @@ function refreshPanel() {
         <div class="p-mini-row"><div class="p-mini-key">Güncel Değer</div><div class="p-mini-val">${hd ? fUSD(c.valUSD) : '—'}</div></div>
         <div class="p-mini-row"><div class="p-mini-key">K/Z Tutar</div><div class="p-mini-val ${usdPctClass}">${hd ? fUSD(c.kzUSD) : '—'}</div></div>
       </div>
-    </div>`;
+    </div>
+    ${(() => {
+      const irr = hd ? calcIRR(s) : null;
+      if (irr === null) return '';
+      const irrCls = irr >= 0 ? 'g' : 'r';
+      const irrColor = irr >= 0 ? 'var(--purple)' : 'var(--red)';
+      return `<div style="margin-top:10px;background:var(--purple-l);border:1px solid rgba(107,63,204,.18);border-radius:9px;padding:11px 13px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--purple);font-family:var(--mono)">IRR — Yıllık Getiri (USD)</div>
+          <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:${irrColor}">${irr>=0?'+':''}${irr.toFixed(2)}%</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.5">DCA alımlarınızın tarihleri ve USD maliyetleri dikkate alınarak hesaplanan yıllık bileşik getiri oranıdır (Internal Rate of Return).</div>
+      </div>`;
+    })()}`;
 
   const lots = s.lots || [];
   if (!lots.length) {
