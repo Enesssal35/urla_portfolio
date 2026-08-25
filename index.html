@@ -1629,10 +1629,22 @@ function saveFx() {
 // ══════════════════════════════════════════════════════════════
 function exportData() {
   const data = {portfolio, usdTry, exportedAt: new Date().toISOString()};
-  const a = document.createElement('a');
-  a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(data, null, 2));
-  a.download = 'avatar-portfolio-' + today() + '.json';
-  a.click();
+  const json = JSON.stringify(data, null, 2);
+  try {
+    // Mobil Chrome dahil tüm tarayıcılarda çalışan yöntem
+    const blob = new Blob([json], {type: 'application/json'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'avatar-portfolio-' + today() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch(e) {
+    // Fallback: kopyalanabilir metin kutusunda göster
+    prompt('Aşağıdaki veriyi kopyalayıp saklayın:', json);
+  }
 }
 function importData(e) {
   const file = e.target.files[0]; if (!file) return;
