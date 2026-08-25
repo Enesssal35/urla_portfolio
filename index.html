@@ -447,15 +447,23 @@ hr.dv{border:none;border-top:1px solid var(--border);margin:14px 0;}
   </div>
 
   <!-- Filtre & Tarama Çubuğu -->
-  <div class="div-filter-row">
-    <button class="div-fbtn active" id="divFAll"     onclick="filterDivTable('all')">Tümü</button>
-    <button class="div-fbtn"        id="divFPaid"    onclick="filterDivTable('paid')">✅ Yatırıldı</button>
-    <button class="div-fbtn"        id="divFSoon"    onclick="filterDivTable('soon')">🏦 İşlemde</button>
-    <button class="div-fbtn"        id="divFPending" onclick="filterDivTable('pending')">📅 Bekliyor</button>
-    <div class="div-scan-pill">
-      <div class="div-scan-dot" id="divScanDot"></div>
-      <span id="divScanText" style="font-size:10px;color:var(--muted)">—</span>
-      <button class="div-fbtn" onclick="manualDivScan()" title="KAP'tan yeni temettü ara" style="margin-left:4px">🔄 Şimdi Tara</button>
+  <div class="div-filter-row" style="flex-wrap:wrap;gap:6px;align-items:center">
+    <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+      <button class="div-fbtn active" id="divFAll"     onclick="filterDivTable('all')">Tümü</button>
+      <button class="div-fbtn"        id="divFPaid"    onclick="filterDivTable('paid')">✅ Yatırıldı</button>
+      <button class="div-fbtn"        id="divFSoon"    onclick="filterDivTable('soon')">🏦 İşlemde</button>
+      <button class="div-fbtn"        id="divFPending" onclick="filterDivTable('pending')">📅 Bekliyor</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto">
+      <select id="divTickerFilter" onchange="filterDivTable(divFilter)"
+        style="height:28px;padding:0 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer">
+        <option value="">Hisse: Tümü</option>
+      </select>
+      <div class="div-scan-pill">
+        <div class="div-scan-dot" id="divScanDot"></div>
+        <span id="divScanText" style="font-size:10px;color:var(--muted)">—</span>
+        <button class="div-fbtn" onclick="manualDivScan()" title="KAP'tan yeni temettü ara" style="margin-left:4px">🔄 Şimdi Tara</button>
+      </div>
     </div>
   </div>
 
@@ -1834,10 +1842,14 @@ function saveDivRecords() {
   localStorage.setItem('avDivRecords', JSON.stringify(divRecords));
 }
 
-function getDivLots(ticker) {
+// Hak kullanım tarihinde (exDate) elimdeki lot sayısı
+function getDivLots(ticker, exDate) {
   const s = portfolio.find(p => p.ticker === ticker);
   if (!s || !s.lots) return 0;
-  return s.lots.reduce((sum, l) => sum + (l.qty || 0), 0);
+  // Sadece hak kullanım tarihi veya öncesinde alınan lotları say
+  return s.lots
+    .filter(l => !l.date || !exDate || l.date <= exDate)
+    .reduce((sum, l) => sum + (l.qty || 0), 0);
 }
 
 function getDivStatus(r) {
@@ -1851,7 +1863,7 @@ function calcDivRow(r) {
   const gross     = (r.overrideGross  !== undefined && r.overrideGross  !== null) ? r.overrideGross  : r.grossPerShare;
   const stopajPct = (r.overrideStopaj !== undefined && r.overrideStopaj !== null) ? r.overrideStopaj : r.stopaj;
   const net       = gross * (1 - stopajPct / 100);
-  const lots      = getDivLots(r.ticker);
+  const lots      = getDivLots(r.ticker, r.exDate); // ← hak kullanım tarihindeki lot
   return { gross, stopajPct, net, lots, totalGross: gross * lots, totalNet: net * lots };
 }
 
@@ -1878,14 +1890,24 @@ function renderDivTable() {
   if (ge('dtSumPaid'))    ge('dtSumPaid').textContent    = fTL(totPaid);
   if (ge('dtSumPending')) ge('dtSumPending').textContent = fTL(totPending);
 
-  // Apply status filter
-  const filtered = divFilter === 'all' ? eligible
-    : eligible.filter(r => getDivStatus(r) === divFilter);
+  // Hisse dropdown'ını güncelle (mevcut seçimi koru)
+  const sel = document.getElementById('divTickerFilter');
+  if (sel) {
+    const tickers = [...new Set(eligible.map(r => r.ticker))].sort();
+    const curTicker = sel.value;
+    sel.innerHTML = '<option value="">Hisse: Tümü</option>' +
+      tickers.map(t => `<option value="${t}"${t === curTicker ? ' selected' : ''}>${t.replace('.IS','')}</option>`).join('');
+  }
+
+  // Durum + hisse filtresini uygula
+  const tickerFilter = sel ? sel.value : '';
+  const filtered = eligible
+    .filter(r => divFilter === 'all' || getDivStatus(r) === divFilter)
+    .filter(r => !tickerFilter || r.ticker === tickerFilter);
 
   if (!filtered.length) {
-    tbody.innerHTML = '';
-    if (emptyMsg) emptyMsg.style.display = eligible.length ? '' : '';
-    if (emptyMsg) emptyMsg.style.display = '';
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;font-size:11px">Bu filtre için kayıt bulunamadı.</td></tr>`;
+    if (emptyMsg) emptyMsg.style.display = 'none';
     return;
   }
   if (emptyMsg) emptyMsg.style.display = 'none';
